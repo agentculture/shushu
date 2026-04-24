@@ -10,7 +10,7 @@ Remote: `https://github.com/OriNachum/shushu`
 
 ## Layout
 
-```
+```text
 src/shushu/          # package (src-layout)
   __init__.py        # exports __version__
   __main__.py        # enables `python -m shushu`
