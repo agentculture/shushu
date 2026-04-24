@@ -127,3 +127,62 @@ def test_alert_at_parsed_and_stored():
     )
     rec = store.load().secrets[0]
     assert rec.alert_at == date(2030, 1, 1)
+
+
+def test_set_secret_rejects_changing_source_on_overwrite():
+    store.set_secret(name="FOO", value="v1", hidden=False, source="localhost", purpose="")
+    with pytest.raises(store.ValidationError) as exc:
+        store.set_secret(
+            name="FOO", value="v2", hidden=False, source="https://elsewhere", purpose=""
+        )
+    assert "source is immutable" in str(exc.value)
+
+
+def test_set_secret_rejects_changing_hidden_on_overwrite():
+    store.set_secret(name="FOO", value="v1", hidden=False, source="localhost", purpose="")
+    with pytest.raises(store.ValidationError) as exc:
+        store.set_secret(name="FOO", value="v2", hidden=True, source="localhost", purpose="")
+    assert "hidden is immutable" in str(exc.value)
+
+
+def test_corrupt_json_raises_state_error():
+    paths = store._paths()
+    paths.dir.mkdir(parents=True, exist_ok=True)
+    paths.file.write_text("{ this is not json")
+    with pytest.raises(store.StateError) as exc:
+        store.load()
+    assert "JSON" in str(exc.value) or "json" in str(exc.value)
+
+
+def test_schema_version_as_string_raises_state_error():
+    paths = store._paths()
+    paths.dir.mkdir(parents=True, exist_ok=True)
+    paths.file.write_text(json.dumps({"schema_version": "1", "secrets": []}))
+    with pytest.raises(store.StateError) as exc:
+        store.load()
+    assert "non-integer schema_version" in str(exc.value)
+
+
+def test_set_secret_on_overwrite_with_empty_purpose_keeps_existing():
+    """Documented falsy-merge: set_secret(purpose='') on overwrite keeps prior purpose."""
+    store.set_secret(name="FOO", value="v1", hidden=False, source="localhost", purpose="orig")
+    store.set_secret(name="FOO", value="v2", hidden=False, source="localhost", purpose="")
+    rec = store.load().secrets[0]
+    assert rec.purpose == "orig"
+
+
+def test_update_metadata_empty_purpose_clears_existing():
+    """update_metadata distinguishes None (leave alone) from "" (clear)."""
+    store.set_secret(name="FOO", value="v", hidden=False, source="localhost", purpose="orig")
+    store.update_metadata(name="FOO", purpose="")
+    rec = store.load().secrets[0]
+    assert rec.purpose == ""
+
+
+def test_utf8_roundtrip():
+    """Arbitrary UTF-8 in values must survive serialization (spec §4.3)."""
+    store.set_secret(
+        name="UNICODE", value="pa$$wörd-日本語-🔑", hidden=False, source="localhost", purpose=""
+    )
+    rec = store.load().secrets[0]
+    assert rec.value == "pa$$wörd-日本語-🔑"
