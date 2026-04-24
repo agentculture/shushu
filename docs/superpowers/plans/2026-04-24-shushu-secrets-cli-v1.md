@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import importlib.metadata
 import io
-import sys
 from contextlib import redirect_stdout
 
 import pytest
