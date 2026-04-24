@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Bump the version in pyproject.toml, __init__.py, and CHANGELOG.md.
+"""Bump the version in pyproject.toml and CHANGELOG.md.
 
 Usage:
     bump.py major    # 0.1.0 -> 1.0.0
     bump.py minor    # 0.1.0 -> 0.2.0
     bump.py patch    # 0.1.0 -> 0.1.1
     bump.py show     # print current version
+
+pyproject.toml is the single source of truth for the version. shushu's
+`src/shushu/__init__.py` reads it via `importlib.metadata.version()` at
+import time, so no literal needs patching there.
 
 Changelog entries are passed via stdin as a JSON object:
     {
@@ -110,7 +114,14 @@ def format_changelog_section(new: str, entries: dict) -> str:
 
 
 def update_changelog(project_root: Path, new: str, entries: dict) -> None:
-    """Insert a new changelog entry into CHANGELOG.md."""
+    """Insert a new changelog entry into CHANGELOG.md.
+
+    Keeps Keep-a-Changelog structure intact: the [Unreleased] header stays
+    at the top as a placeholder for future work, and the new release
+    section is inserted right after its body (before the next `## [`
+    header, if any). If no [Unreleased] header is found, the entry is
+    prepended before the first `## [` header as a fallback.
+    """
     changelog = project_root / "CHANGELOG.md"
     if not changelog.exists():
         print("No CHANGELOG.md found — skipping")
@@ -119,10 +130,27 @@ def update_changelog(project_root: Path, new: str, entries: dict) -> None:
     text = changelog.read_text()
     new_entry = format_changelog_section(new, entries)
 
-    marker = "## ["
-    idx = text.find(marker)
-    if idx > 0:
-        changelog.write_text(text[:idx] + new_entry + text[idx:])
+    unreleased_re = re.compile(r"^## \[Unreleased\].*?$", re.MULTILINE)
+    unreleased_match = unreleased_re.search(text)
+    if unreleased_match:
+        # Find the next "## [" header AFTER the Unreleased one, and insert
+        # the new section just before it. If there is no next header,
+        # append at end of file.
+        next_header = re.search(r"^## \[", text[unreleased_match.end():], re.MULTILINE)
+        if next_header:
+            insert_at = unreleased_match.end() + next_header.start()
+        else:
+            insert_at = len(text)
+            if not text.endswith("\n"):
+                new_entry = "\n" + new_entry
+        changelog.write_text(text[:insert_at] + new_entry + text[insert_at:])
+        print(f"Updated CHANGELOG.md with [{new}] (preserved Unreleased header)")
+        return
+
+    # Fallback: no Unreleased section, prepend before the first release.
+    first_release = re.search(r"^## \[", text, re.MULTILINE)
+    if first_release:
+        changelog.write_text(text[: first_release.start()] + new_entry + text[first_release.start():])
         print(f"Updated CHANGELOG.md with [{new}]")
     else:
         print("WARNING: could not find insertion point in CHANGELOG.md", file=sys.stderr)
@@ -146,20 +174,6 @@ def main():
 
     new = bump(current, part)
     write_version(path, current, new)
-
-    # Also update __init__.py if it has __version__
-    init_candidates = [
-        path.parent / path.parent.name / "__init__.py",
-    ]
-    for init in init_candidates:
-        if init.exists():
-            init_text = init.read_text()
-            if f'__version__ = "{current}"' in init_text:
-                init.write_text(init_text.replace(
-                    f'__version__ = "{current}"',
-                    f'__version__ = "{new}"',
-                ))
-                print(f"Updated {init.relative_to(path.parent)}")
 
     # Update changelog
     update_changelog(path.parent, new, entries)
