@@ -1,0 +1,33 @@
+# Disposable image for running tests that require real useradd/userdel.
+#
+# Root is INTENTIONAL. This image exists solely to run the integration
+# tests in tests/integration/, which exercise `useradd` and `userdel` and
+# therefore need root. The container is built per-CI-run, runs no user
+# code outside the pytest invocation, and is discarded after. See
+# docs/threat-model.md for the long-form discussion + the rootless-refactor
+# alternative (planned in Task 28).
+#
+# (SonarCloud hotspot docker:S6471 is marked REVIEWED/SAFE for this
+# image in the SonarCloud UI; see agentculture/shushu PR history.)
+FROM python:3.12-slim
+
+# Make root explicit so intent is obvious in the Dockerfile, not only
+# inherited from the base image.
+USER root
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends sudo passwd \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir uv
+
+WORKDIR /app
+# README.md must be present for hatchling to validate the project metadata
+# during `uv sync` (pyproject.toml declares `readme = "README.md"`).
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+COPY tests ./tests
+
+RUN uv sync
+
+# Default runs unit + integration. Override at `docker run` time.
+CMD ["uv", "run", "pytest", "-v"]
