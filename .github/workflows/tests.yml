@@ -34,6 +34,9 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    # Skip until tests/integration/ exists (planned: Task 26 — admin setuid-fork
+    # handoff tests that need real useradd/userdel inside a disposable container).
+    if: hashFiles('tests/integration/**') != ''
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
       - name: Build integration image
