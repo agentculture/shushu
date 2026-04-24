@@ -18,8 +18,13 @@ from shushu.users import UserInfo
 class PrivilegeError(Exception):
     """Raised when an operation requires root and the process is not root."""
 
-    def __init__(self, message: str, remediation: str) -> None:
-        super().__init__(message, remediation)
+    def __init__(self, message: str, remediation: str) -> None:  # noqa: B042
+        # B042 would prefer `super().__init__(message, remediation)` for
+        # pickle round-trips, but that makes `str(exc)` a tuple repr and
+        # breaks readable error output. PrivilegeError is not pickled
+        # anywhere in shushu; we keep str(exc) clean and expose
+        # remediation via the attribute.
+        super().__init__(message)
         self.message = message
         self.remediation = remediation
 
