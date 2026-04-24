@@ -53,11 +53,12 @@ Pass via stdin. All fields are optional — only non-empty sections are rendered
 
 ## What It Updates
 
-1. `pyproject.toml` — the `version = "x.y.z"` field.
-2. `src/shushu/__init__.py` — the `__version__` string (must stay in sync
-   with `pyproject.toml`; `cli.py` reads it directly and `test_default_prints_version`
-   asserts the two agree).
-3. `CHANGELOG.md` — inserts a new `## [x.y.z] - YYYY-MM-DD` entry at the top.
+1. `pyproject.toml` — the `version = "x.y.z"` field. **Single source of truth.**
+2. `CHANGELOG.md` — inserts a new `## [x.y.z] - YYYY-MM-DD` entry at the top.
+
+`src/shushu/__init__.py` sources `__version__` from
+`importlib.metadata.version("shushu")` at import time, so it does not need to
+be bumped separately.
 
 ## Workflow
 
