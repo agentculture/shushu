@@ -22,7 +22,6 @@ def handle(args) -> int:
 
 def _handle_all_users(args) -> int:
     import json as _json
-    import os as _os  # noqa: F401 — used for clarity; admin.for_each_user enforces root
 
     from shushu import admin
 

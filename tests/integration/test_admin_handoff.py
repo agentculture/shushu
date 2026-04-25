@@ -16,10 +16,13 @@ import sys
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    os.geteuid() != 0 and not os.getenv("SHUSHU_DOCKER"),
-    reason="admin handoff requires root (CI runs this inside a container)",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        os.geteuid() != 0 and not os.getenv("SHUSHU_DOCKER"),
+        reason="admin handoff requires root (CI runs this inside a container)",
+    ),
+]
 
 
 @pytest.fixture(scope="module")

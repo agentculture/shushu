@@ -80,10 +80,12 @@ def run_as_user(user: UserInfo, fn: Callable[[], int]) -> int:
             rc = fn()
         except PrivilegeError as exc:
             sys.stderr.write(f"shushu: error: {exc.message}\n  → {exc.remediation}\n")
+            sys.stdout.flush()
             sys.stderr.flush()
             os._exit(66)
         except Exception as exc:  # pragma: no cover
             sys.stderr.write(f"shushu: internal error in admin handoff: {exc!r}\n")
+            sys.stdout.flush()
             sys.stderr.flush()
             os._exit(70)
         # os._exit bypasses Python finalization, including atexit handlers and

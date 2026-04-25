@@ -135,13 +135,6 @@ def _set_metadata_only(args, alert_at):
     )
 
 
-def _rebuild_admin_tail(args) -> str:
-    parts = ["set", "--user", args.user, args.name]
-    if args.value is not None:
-        parts.append(args.value)
-    return " ".join(parts)
-
-
 def _emit_ok(rec, json_mode: bool) -> None:
     if json_mode:
         emit_result(

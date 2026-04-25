@@ -13,10 +13,13 @@ import sys
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    os.geteuid() != 0 and not os.getenv("SHUSHU_DOCKER"),
-    reason="requires root",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        os.geteuid() != 0 and not os.getenv("SHUSHU_DOCKER"),
+        reason="requires root",
+    ),
+]
 
 _TEST_USER = "shushutest_carol"
 
