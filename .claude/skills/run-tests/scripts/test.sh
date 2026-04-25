@@ -50,6 +50,7 @@ cleanup() {
         rm -rf "$ROOT"
         echo "[run-tests] cleaned $ROOT"
     fi
+    return 0
 }
 
 if [[ -n "$CLEAN_ONLY" ]]; then

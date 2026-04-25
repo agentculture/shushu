@@ -133,6 +133,14 @@ esac
 printf "  %-12s %s Quality Gate %s, %d OPEN issue(s), %d hotspot(s)\n" \
     "SonarCloud" "$SONAR_SYM" "$SONAR_QG_STATUS" "$SONAR_OPEN" "$SONAR_HOTSPOTS"
 
+# When SonarCloud has OPEN issues, list them — saves a follow-up curl.
+if [[ "$SONAR_OPEN" != "0" ]]; then
+    echo
+    echo "  SonarCloud OPEN issues:"
+    curl -s "https://sonarcloud.io/api/issues/search?componentKeys=${SONAR_KEY}&pullRequest=${PR_NUMBER}&statuses=OPEN,CONFIRMED&ps=20" \
+        | jq -r '.issues[] | "    • [\(.rule)] \(.component | sub("^[^:]+:"; ""))(:\(.line // "?")) (\(.severity)) — \(.message)"'
+fi
+
 # ── 5. Tally + summary ────────────────────────────────────────────────────
 echo
 echo "── Inline threads ────────────────────────────────────────────────────"
