@@ -6,7 +6,20 @@ with merged PRs per the per-PR version bump discipline documented in
 
 ## [Unreleased]
 
-- (nothing yet — v0.3.1 cut; next bump on the following PR)
+- (nothing yet — v0.4.0 cut; next bump on the following PR)
+
+## [0.4.0] — 2026-04-25
+
+### Added
+
+- `shushu learn` — agent-authored self-teaching output. Text mode prints a markdown summary of every verb and concept; `--json` returns a structured payload (`verbs`, `descriptions`, `concepts`) for machine consumers.
+- `shushu explain <topic>` — short markdown body per topic. Topics include every verb plus the conceptual entries `hidden`, `admin`, `alert_at`. Unknown topics exit 64 with a `try: ...` remediation hint.
+- `shushu doctor` — read-only setup / permission / schema integrity checks against the invoker's own store. Verifies store dir mode (`0o700`), secrets file mode (`0o600`), `schema_version`, and per-record validity (empty `purpose` / `rotation_howto`, expired or alerting `alert_at`). Text mode prints `[STATUS] name: detail` per check + a summary line; `--json` returns `{checks: [...], summary: {pass, warn, fail}}`. Exit 0 unless any FAIL (then `EXIT_STATE` = 65). `--user` / `--all-users` raise a `not yet implemented` error pending Task 26.
+- `shushu overview` — rich metadata snapshot of every secret in the invoker's store with alert classification (`ok` / `alerting` / `expired`). `--expired` filters to expired records only; `--json` returns the full structured payload. **Never prints `value`.** `--user` / `--all-users` raise a `not yet implemented` error pending Task 26.
+
+### Tests
+
+- 11 new unit tests covering the `learn`, `explain`, `doctor`, and `overview` verbs end-to-end. Total: 77 tests passing.
 
 ## [0.3.1] — 2026-04-24
 
