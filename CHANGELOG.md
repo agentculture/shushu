@@ -6,7 +6,25 @@ with merged PRs per the per-PR version bump discipline documented in
 
 ## [Unreleased]
 
-- (nothing yet — v0.5.0 cut; next bump on the following PR)
+- (nothing yet — v0.6.0 cut; next bump on the following PR)
+
+## [0.6.0] — 2026-04-25
+
+### Added
+
+- `shushu get NAME [--json]` — print a secret's value to stdout. Refuses if `hidden=True` (HiddenError → exit 64 with remediation pointing at `shushu run --inject`). The `get` parser deliberately does NOT register `--user` / `--all-users`: admin can never extract values via the CLI (H2 hidden-secret contract).
+- `shushu env NAME1 [NAME2 ...]` — emit POSIX single-quoted `export` lines for `eval $(shushu env A B)`. Refuses **the whole call** if any named secret is hidden (atomicity — never a partial print before the error). Single-quote escaping round-trips through bash for arbitrary values (verified by `test_env_escapes_single_quotes_posix_safe`).
+- `shushu run --inject VAR=NAME [--inject ...] -- cmd [args...]` — `os.execvpe` the child process with secrets stamped into env. Both visible and hidden secrets are allowed (this is the only consumer for hidden ones). `--inject` parsing emits explicit per-case malform errors (missing `=`, empty VAR, empty NAME). Last-wins on duplicate VAR. Leading `--` after argparse REMAINDER is stripped. `FileNotFoundError` from execvpe → exit 64 with a "check PATH" hint.
+- `shushu list [--json] [--user NAME|--all-users]` — names only, sorted, one per line. `--json` emits `{"ok": true, "names": [...]}`. `--user` / `--all-users` raise structured `not yet implemented` (exit 64) pending Task 26.
+- `shushu delete NAME [--json] [--user NAME]` — remove a secret. NotFoundError → exit 64 via main()'s wrapping. `--user` deferred to Task 26.
+
+### Tooling
+
+- `.claude/skills/run-tests/scripts/test.sh` gained `--clean-smoke <name>` and `--smoke-home <name>` flags. Smoke flows now never need a manual `rm -rf` against `/tmp/shushu-tests/*`; the wrapper validates the namespace (rejects `..`, `/`, empty, etc.) before touching disk. Documented in `docs/testing.md` and the SKILL.md.
+
+### Tests
+
+- 19 new unit tests covering the 5 new verbs end-to-end (4 + 4 + 6 + 3 + 2). Total: 114 tests passing.
 
 ## [0.5.0] — 2026-04-25
 
