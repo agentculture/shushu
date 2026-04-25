@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-import subprocess
+import subprocess  # noqa: S404
 from contextlib import redirect_stderr, redirect_stdout
 
 import pytest
@@ -41,8 +41,9 @@ def test_env_escapes_single_quotes_posix_safe():
     )
     rc, out, _ = _run(["env", "TRICKY"])
     assert rc == 0
-    # Round-trip through bash.
-    result = subprocess.run(
+    # Round-trip through bash. nosec — bash on PATH, args composed from a
+    # value the test itself stores.
+    result = subprocess.run(  # noqa: S603, S607
         ["bash", "-c", f'{out.strip()}; printf %s "$TRICKY"'],
         capture_output=True,
         text=True,

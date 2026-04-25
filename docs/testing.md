@@ -44,20 +44,25 @@ mutation is scoped to the test via `monkeypatch`.
 When running ad-hoc `SHUSHU_HOME=...` smoke commands by hand from the
 shell — e.g., to verify a new verb in a fresh store — use the
 `/tmp/shushu-tests/smoke-<topic>/` namespace, NOT scattered top-level
-paths like `/tmp/shushu-pr5` or `/tmp/shushu-task18-smoke`. Pattern:
+paths like `/tmp/shushu-pr5` or `/tmp/shushu-task18-smoke`. Use the
+run-tests wrapper to get the path and to clean up; **never write a
+direct `rm -rf` against `/tmp/shushu-tests/*` by hand.**
 
 ```bash
-mkdir -p /tmp/shushu-tests
-SMOKE=/tmp/shushu-tests/smoke-task19
-rm -rf "$SMOKE"
+TEST_SH=.claude/skills/run-tests/scripts/test.sh
+SMOKE="$(bash $TEST_SH --smoke-home task22)"   # prints /tmp/shushu-tests/smoke-task22
+bash $TEST_SH --clean-smoke task22              # safe wipe, validated name
 SHUSHU_HOME="$SMOKE" uv run shushu generate KEY
 SHUSHU_HOME="$SMOKE" uv run shushu generate SEKRET --hidden
-rm -rf "$SMOKE"   # always clean up your own artifacts
+bash $TEST_SH --clean-smoke task22              # always clean up after
 ```
 
-Cleanup discipline: every smoke session begins with `rm -rf "$SMOKE"`
-and ends with the same. Then `rm -rf /tmp/shushu-tests/` is always a
-safe blast-radius reset for the whole project.
+The wrapper validates the namespace (rejects `..`, `/`, empty, etc.)
+so you can't accidentally point the rm at a parent directory.
+
+Cleanup discipline: every smoke session begins and ends with
+`--clean-smoke <name>`. For a full reset of all smoke + pytest
+artifacts at once: `bash $TEST_SH --clean-only`.
 
 ## `SHUSHU_DOCKER` integration gate
 
