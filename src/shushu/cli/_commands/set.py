@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 
 from shushu import alerts, privilege, store
+from shushu.cli._commands._write_helper import write_value
 from shushu.cli._errors import EXIT_USER_ERROR, ShushuError
 from shushu.cli._output import emit_result
 
@@ -65,46 +66,7 @@ def _read_value(v: str) -> str:
 
 
 def _set_with_value(args, value: str, alert_at):
-    try:
-        existing = store.get_record(args.name)
-        existed = True
-    except store.NotFoundError:
-        existing = None
-        existed = False
-
-    if existed:
-        if args.source is not None and args.source != existing.source:
-            raise ShushuError(
-                EXIT_USER_ERROR,
-                "source is immutable post-create",
-                "delete and re-create to change",
-            )
-        if args.hidden and not existing.hidden:
-            raise ShushuError(
-                EXIT_USER_ERROR,
-                "hidden is immutable post-create",
-                "delete and re-create to change",
-            )
-        return store.set_secret(
-            name=args.name,
-            value=value,
-            hidden=existing.hidden,
-            source=existing.source,
-            purpose=args.purpose or existing.purpose,
-            rotation_howto=args.rotate_howto or existing.rotation_howto,
-            alert_at=alert_at if alert_at is not None else existing.alert_at,
-            handed_over_by=existing.handed_over_by,
-        )
-    return store.set_secret(
-        name=args.name,
-        value=value,
-        hidden=args.hidden,
-        source=args.source or "localhost",
-        purpose=args.purpose or "",
-        rotation_howto=args.rotate_howto or "",
-        alert_at=alert_at,
-        handed_over_by=None,
-    )
+    return write_value(args, value, alert_at)
 
 
 def _set_metadata_only(args, alert_at):
