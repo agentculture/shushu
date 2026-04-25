@@ -39,7 +39,7 @@ def test_overview_expired_filter():
     store.set_secret(name="A", value="v", hidden=False, source="localhost", purpose="x")
     store.set_secret(name="B", value="v", hidden=False, source="localhost", purpose="x")
     store.update_metadata(name="A", alert_at=date(1990, 1, 1))
-    rc, out = _run(["overview", "--expired", "--json"])
+    _, out = _run(["overview", "--expired", "--json"])
     payload = json.loads(out)
     names = {r["name"] for r in payload["secrets"]}
     assert names == {"A"}

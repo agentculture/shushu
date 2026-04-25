@@ -32,76 +32,95 @@ def handle(args) -> int:
 
 def _run_self_checks():
     paths = fs.user_store_paths()
-    checks = []
-
-    # 1. store dir
-    if not paths.dir.exists():
-        checks.append({"name": "store_dir", "status": "PASS", "detail": "no store yet (lazy init)"})
-    else:
-        mode = stat_.S_IMODE(paths.dir.stat().st_mode)
-        if mode != 0o700:
-            checks.append(
-                {
-                    "name": "store_dir_mode",
-                    "status": "WARN",
-                    "detail": f"{paths.dir} mode {oct(mode)}; expected 0o700",
-                }
-            )
-        else:
-            checks.append({"name": "store_dir", "status": "PASS", "detail": str(paths.dir)})
-
-    # 2. file + schema
-    if paths.file.exists():
-        mode = stat_.S_IMODE(paths.file.stat().st_mode)
-        if mode != 0o600:
-            checks.append(
-                {
-                    "name": "secrets_file_mode",
-                    "status": "WARN",
-                    "detail": f"{paths.file} mode {oct(mode)}; expected 0o600",
-                }
-            )
-        try:
-            data = store.load()
-            checks.append(
-                {"name": "schema_version", "status": "PASS", "detail": f"v{data.schema_version}"}
-            )
-        except store.StateError as exc:
-            checks.append({"name": "schema_version", "status": "FAIL", "detail": str(exc)})
-            return checks
-    else:
-        data = store.StoreData(schema_version=1, secrets=[])
-        checks.append({"name": "schema_version", "status": "PASS", "detail": "empty store"})
-
-    # 3. per-record checks
-    for r in data.secrets:
-        if not r.purpose:
-            detail = f"{r.name} has empty purpose; consider `shushu set {r.name} --purpose '...'`"
-            checks.append({"name": "purpose", "status": "WARN", "detail": detail})
-        if not r.rotation_howto:
-            detail = (
-                f"{r.name} has empty rotation_howto;"
-                f" consider `shushu set {r.name} --rotate-howto '...'`"
-            )
-            checks.append({"name": "rotation_howto", "status": "WARN", "detail": detail})
-        state = alerts.classify(r.alert_at)
-        if state == "expired":
-            checks.append(
-                {
-                    "name": "alert_at",
-                    "status": "WARN",
-                    "detail": f"{r.name} alert_at={r.alert_at} is expired",
-                }
-            )
-        elif state == "alerting":
-            checks.append(
-                {
-                    "name": "alert_at",
-                    "status": "WARN",
-                    "detail": f"{r.name} alert_at={r.alert_at} is within 30 days",
-                }
-            )
+    checks = [_check_store_dir(paths)]
+    data, file_checks, fatal = _check_secrets_file(paths)
+    checks.extend(file_checks)
+    if fatal:
+        return checks
+    for record in data.secrets:
+        checks.extend(_check_record(record))
     return checks
+
+
+def _check_store_dir(paths):
+    if not paths.dir.exists():
+        return {"name": "store_dir", "status": "PASS", "detail": "no store yet (lazy init)"}
+    mode = stat_.S_IMODE(paths.dir.stat().st_mode)
+    if mode != 0o700:
+        return {
+            "name": "store_dir_mode",
+            "status": "WARN",
+            "detail": f"{paths.dir} mode {oct(mode)}; expected 0o700",
+        }
+    return {"name": "store_dir", "status": "PASS", "detail": str(paths.dir)}
+
+
+def _check_secrets_file(paths):
+    """Return (data, checks, fatal). `fatal=True` means stop further checks."""
+    if not paths.file.exists():
+        empty = store.StoreData(schema_version=1, secrets=[])
+        return empty, [{"name": "schema_version", "status": "PASS", "detail": "empty store"}], False
+    checks = []
+    mode = stat_.S_IMODE(paths.file.stat().st_mode)
+    if mode != 0o600:
+        checks.append(
+            {
+                "name": "secrets_file_mode",
+                "status": "WARN",
+                "detail": f"{paths.file} mode {oct(mode)}; expected 0o600",
+            }
+        )
+    try:
+        data = store.load()
+    except store.StateError as exc:
+        checks.append({"name": "schema_version", "status": "FAIL", "detail": str(exc)})
+        return None, checks, True
+    checks.append({"name": "schema_version", "status": "PASS", "detail": f"v{data.schema_version}"})
+    return data, checks, False
+
+
+def _check_record(record):
+    out = []
+    if not record.purpose:
+        out.append(
+            {
+                "name": "purpose",
+                "status": "WARN",
+                "detail": (
+                    f"{record.name} has empty purpose;"
+                    f" consider `shushu set {record.name} --purpose '...'`"
+                ),
+            }
+        )
+    if not record.rotation_howto:
+        out.append(
+            {
+                "name": "rotation_howto",
+                "status": "WARN",
+                "detail": (
+                    f"{record.name} has empty rotation_howto;"
+                    f" consider `shushu set {record.name} --rotate-howto '...'`"
+                ),
+            }
+        )
+    state = alerts.classify(record.alert_at)
+    if state == "expired":
+        out.append(
+            {
+                "name": "alert_at",
+                "status": "WARN",
+                "detail": f"{record.name} alert_at={record.alert_at} is expired",
+            }
+        )
+    elif state == "alerting":
+        out.append(
+            {
+                "name": "alert_at",
+                "status": "WARN",
+                "detail": f"{record.name} alert_at={record.alert_at} is within 30 days",
+            }
+        )
+    return out
 
 
 def _summarize(checks):

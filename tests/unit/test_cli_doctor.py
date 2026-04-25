@@ -23,7 +23,7 @@ def _run(argv):
 
 
 def test_doctor_empty_store_reports_pass():
-    rc, out, _ = _run(["doctor", "--json"])
+    _, out, _ = _run(["doctor", "--json"])
     payload = json.loads(out)
     assert payload["ok"] is True
     assert payload["summary"]["fail"] == 0
@@ -31,7 +31,7 @@ def test_doctor_empty_store_reports_pass():
 
 def test_doctor_reports_warn_on_empty_purpose():
     store.set_secret(name="FOO", value="v", hidden=False, source="localhost", purpose="")
-    rc, out, _ = _run(["doctor", "--json"])
+    _, out, _ = _run(["doctor", "--json"])
     payload = json.loads(out)
     checks = payload["checks"]
     assert any(c["name"] == "purpose" and c["status"] == "WARN" for c in checks), checks
@@ -49,6 +49,6 @@ def test_doctor_reports_warn_on_expired_alert():
         rotation_howto="rotate",
     )
     store.update_metadata(name="OLD", alert_at=datetime.date(1990, 1, 1))
-    rc, out, _ = _run(["doctor", "--json"])
+    _, out, _ = _run(["doctor", "--json"])
     payload = json.loads(out)
     assert any(c["name"] == "alert_at" and c["status"] == "WARN" for c in payload["checks"])

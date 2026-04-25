@@ -13,9 +13,7 @@ _VERBS = {
     "get": "Print value to stdout. Refused if hidden.",
     "env": "Emit shell export lines for eval. Refused if any named secret is hidden.",
     "run": "Spawn a command with secrets injected as env vars. Works for hidden and non-hidden.",
-    "generate": (
-        "Create a random secret (hex or base64)." " --hidden to make it write-only-via-inject."
-    ),
+    "generate": "Create a random secret (hex or base64). --hidden hides value from print.",
     "list": "Names only, one per line. Scriptable.",
     "delete": "Remove a secret.",
     "overview": "Rich metadata snapshot; alert classification; --expired filter.",
@@ -36,20 +34,29 @@ _CONCEPTS = [
 ]
 
 
-def handle(args) -> int:
-    if args.json:
-        emit_result(
-            {"verbs": sorted(_VERBS.keys()), "descriptions": _VERBS, "concepts": _CONCEPTS},
-            json_mode=True,
-        )
-        return 0
-    lines = ["# shushu — agent-first per-OS-user secrets manager", ""]
-    lines.append("## Verbs")
+def _format_text() -> str:
+    lines = [
+        "# shushu — agent-first per-OS-user secrets manager",
+        "",
+        "## Verbs",
+    ]
     for verb in sorted(_VERBS):
         lines.append(f"- `{verb}` — {_VERBS[verb]}")
     lines.append("")
     lines.append("## Concepts")
-    for c in _CONCEPTS:
-        lines.append(f"- {c}")
-    emit_result("\n".join(lines), json_mode=False)
+    for concept in _CONCEPTS:
+        lines.append(f"- {concept}")
+    return "\n".join(lines)
+
+
+def handle(args) -> int:
+    if args.json:
+        payload = {
+            "verbs": sorted(_VERBS.keys()),
+            "descriptions": _VERBS,
+            "concepts": _CONCEPTS,
+        }
+        emit_result(payload, json_mode=True)
+    else:
+        emit_result(_format_text(), json_mode=False)
     return 0

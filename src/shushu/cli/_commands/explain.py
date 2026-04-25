@@ -42,7 +42,7 @@ _TOPICS = {
         "`shushu list [--json] [--user NAME|--all-users]`\n\n"
         "Names only, one per line. Scriptable."
     ),
-    "delete": ("`shushu delete NAME`\n\n" "Remove a secret. No undo."),
+    "delete": "`shushu delete NAME`\n\nRemove a secret. No undo.",
     "overview": (
         "`shushu overview [--json] [--expired] [--user NAME|--all-users]`\n\n"
         "Rich metadata snapshot with alert classification."
