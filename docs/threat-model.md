@@ -84,8 +84,8 @@ read every hidden value. shushu's `hidden=True` flag enforces:
   admin can NEVER extract values via the CLI surface, even for root.
 
 The CLI is the contract. Anyone with shell access to the same uid
-can read the plaintext. v2 will add real at-rest encryption — see
-the residual-risks table below.
+can read the plaintext. A future v1.x release will add real at-rest
+encryption — see the residual-risks table below.
 
 ### 4. Admin metadata exfiltration
 
@@ -131,21 +131,21 @@ and stamped into the child's env, never on the command line.
 
 | Risk | Mitigation status |
 |---|---|
-| Plaintext at rest in `secrets.json` | Tracked as the encryption-at-rest issue (see below); v2 candidate. |
+| Plaintext at rest in `secrets.json` | Tracked as the encryption-at-rest issue (see below); v1.x candidate. |
 | Root can `cat` any user's secrets directly | CLI surface doesn't expose values via admin verbs; accepted (root is by definition trusted). |
-| Orphan stores after user deletion | `doctor --all-users` enumerates orphan stores; cleanup verb deferred to v2. |
+| Orphan stores after user deletion | `doctor --all-users` enumerates orphan stores; cleanup verb deferred to a future v1.x release. |
 | setuid-fork TOCTOU with concurrent `usermod` | Accepted on trusted-admin host. |
 | Shell-history leakage of literal `set NAME value` | Stdin form (`set NAME -`) is the documented preferred shape; covered in `shushu explain set`. |
 
 ## Encryption-at-rest tracking issue
 
-shushu v1 deliberately ships without on-disk encryption. The full
-rationale + v2 candidate approaches (age, libsecret, pass/gpg) are
-captured in the tracking issue:
+The current 0.x line deliberately ships without on-disk encryption.
+The full rationale + candidate approaches (age, libsecret, pass/gpg)
+are captured in the tracking issue:
 
-<!-- TODO: replace with real issue URL after Task 29 step 1 -->
-**Issue:** [v2: encryption at rest for secret values](https://github.com/agentculture/shushu/issues/new)
+**Issue:** [#8 — v1.x: encryption at rest for secret values](https://github.com/agentculture/shushu/issues/8)
 
 The threat-model assertion that "values are not encrypted at rest"
-is a deliberate v1 choice, not an oversight. v2 will add real
-at-rest encryption with a `schema_version = 2` migration.
+is a deliberate 0.x choice, not an oversight. A future v1.x release
+will add real at-rest encryption with a `schema_version = 2`
+migration.

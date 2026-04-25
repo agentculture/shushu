@@ -8,13 +8,15 @@ with merged PRs per the per-PR version bump discipline documented in
 
 - (nothing yet — v0.8.0 cut; next bump on the following PR)
 
-## [0.8.0] — 2026-04-25 — v1 release-prep
+## [0.8.0] — 2026-04-25 — spec-complete release-prep
 
-This is the **last PR of the v1 cycle**. After this lands, every verb
-in the design spec runs end-to-end (self-mode and admin-mode), the
-test pyramid has full unit + lifecycle + integration coverage, and
-the docs are production-shape. PRs after this start v1.x maintenance
-or v2 (encryption-at-rest) work.
+This is the **last PR of the spec-complete cycle on the 0.x line**.
+After this lands, every verb in the design spec runs end-to-end
+(self-mode and admin-mode), the test pyramid has full unit +
+lifecycle + integration coverage, and the docs are production-shape.
+PRs after this start 0.x maintenance work or v1.x feature work
+(encryption-at-rest is tracked at
+[issue #8](https://github.com/agentculture/shushu/issues/8)).
 
 ### Added
 

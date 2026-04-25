@@ -92,7 +92,9 @@ A secret with `hidden: true`:
 - Is consumable **only** through `shushu run --inject VAR=NAME -- cmd`.
 
 Hidden is a CLI contract, not encryption. The on-disk file is
-plaintext at `0600`. Encryption-at-rest is tracked for v2.
+plaintext at `0600`. Encryption-at-rest is tracked for a future
+v1.x release in
+[issue #8](https://github.com/agentculture/shushu/issues/8).
 
 ## Exit codes
 
