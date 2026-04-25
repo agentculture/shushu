@@ -1,7 +1,43 @@
 # shushu testing notes
 
-(Stub — full content lands in Task 28. This page only documents the
-test-isolation conventions wired into the suite today.)
+shushu's test pyramid has three layers:
+
+1. **Unit tests** (`tests/unit/`) — the bulk of coverage; per-module
+   tests for `fs`, `alerts`, `generate`, `users`, `privilege`, `store`,
+   plus per-verb CLI tests. Runs in milliseconds, no privilege
+   required.
+2. **End-to-end self-verify** (`tests/test_self_verify.py`) — a single
+   13-step lifecycle test that walks every verb against a fresh
+   `tmp_path` store. The acceptance gate; a regression here blocks
+   the commit.
+3. **Integration tests** (`tests/integration/`) — exercise real
+   `useradd` / `userdel` and the setuid-fork handoff. Gated behind
+   `SHUSHU_DOCKER=1` and run inside the disposable Docker image at
+   `.github/workflows/Dockerfile.integration`.
+
+Common runner is the `run-tests` skill at
+`.claude/skills/run-tests/scripts/test.sh` (the wrapper that pins
+pytest's basetemp + adds smoke-namespace cleanup).
+
+## How to run the suite
+
+```bash
+# unit + self-verify (skips integration without SHUSHU_DOCKER)
+bash .claude/skills/run-tests/scripts/test.sh -p
+
+# CI parity: parallel + coverage + xml + verbose
+bash .claude/skills/run-tests/scripts/test.sh --ci
+
+# integration only, inside Docker (needs root for useradd)
+docker build -f .github/workflows/Dockerfile.integration -t shushu-int .
+docker run --rm -e SHUSHU_DOCKER=1 shushu-int uv run pytest tests/integration -v
+
+# Coverage report to terminal
+uv run pytest --cov=shushu --cov-report=term
+
+# Single test
+bash .claude/skills/run-tests/scripts/test.sh tests/unit/test_cli_set.py -x
+```
 
 ## Test artifacts live under `/tmp/shushu-tests/`
 

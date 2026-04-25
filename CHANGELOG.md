@@ -6,7 +6,30 @@ with merged PRs per the per-PR version bump discipline documented in
 
 ## [Unreleased]
 
-- (nothing yet — v0.7.0 cut; next bump on the following PR)
+- (nothing yet — v0.8.0 cut; next bump on the following PR)
+
+## [0.8.0] — 2026-04-25 — spec-complete release-prep
+
+This is the **last PR of the spec-complete cycle on the 0.x line**.
+After this lands, every verb in the design spec runs end-to-end
+(self-mode and admin-mode), the test pyramid has full unit +
+lifecycle + integration coverage, and the docs are production-shape.
+PRs after this start 0.x maintenance work or v1.x feature work
+(encryption-at-rest is tracked at
+[issue #8](https://github.com/agentculture/shushu/issues/8)).
+
+### Added
+
+- `tests/test_self_verify.py` — single 13-step end-to-end lifecycle test that walks every verb against a fresh `tmp_path` store, asserting the H2 hidden contract holds across set / generate / show / get / env / run / list / delete / doctor / overview / metadata-only update / immutable refusal. Acts as the squash-merge-blocking acceptance gate. Uses the shared `cli_run` fixture from `tests/conftest.py`. The single subprocess call (step 8, `run --inject`) exists because `os.execvpe` would otherwise replace the pytest process.
+- `docs/threat-model.md` (full) — expands spec §8 into a self-contained threat-model statement: trust boundary, adversary model (5 must-prevents for non-root local users), 6 risk surfaces (setuid-fork handoff, file-mode drift, hidden-secret CLI contract, admin metadata exfiltration, command-line argument leakage, input validation), residual-risks table, link to the encryption-at-rest tracking issue.
+- `docs/rubric-mapping.md` (full) — per-verb reference: exit-code table (0 / 64 / 65 / 66 / 67 / 70), JSON success envelope (`{"ok": true, ...}`), one section per verb covering purpose, exit codes with reasons, and JSON payload shape. Ends with the admin-flag matrix and the rationale for why `get` / `env` / `run` are deliberately admin-flag-free.
+- `README.md` — full rewrite. Stdin-form (`shushu set FOO -`) is the canonical example to keep values out of `/proc/<pid>/cmdline` and shell history. H2 contract spelled out. Admin handoff section. Exit-code table.
+- `CLAUDE.md` — full rewrite. Post-v1 orientation: complete src layout, common commands using the run-tests / pr-review skill scripts, version discipline, the H2 contract as non-negotiable, trust boundary, recurring PR-pushback rules.
+- `docs/testing.md` — extended with the test pyramid section (unit → self-verify → integration) and the run-tests wrapper invocation matrix.
+
+### Changed
+
+- Version bumped `0.7.0 → 0.8.0`. Continues the per-PR minor cadence (1.0.0 deferred — see Out of scope).
 
 ## [0.7.0] — 2026-04-25
 
