@@ -5,7 +5,7 @@ from __future__ import annotations
 import stat as stat_
 
 from shushu import alerts, fs, store
-from shushu.cli._errors import EXIT_STATE, ShushuError
+from shushu.cli._errors import EXIT_STATE, EXIT_USER_ERROR, ShushuError
 from shushu.cli._output import emit_result
 
 
@@ -14,7 +14,7 @@ def handle(args) -> int:
     # Admin variants (--user / --all-users) are wired in Task 26.
     if getattr(args, "user", None) or getattr(args, "all_users", False):
         raise ShushuError(
-            66,
+            EXIT_USER_ERROR,
             "doctor --user / --all-users not yet implemented",
             "coming in Task 26",
         )
@@ -45,7 +45,14 @@ def _run_self_checks():
 def _check_store_dir(paths):
     if not paths.dir.exists():
         return {"name": "store_dir", "status": "PASS", "detail": "no store yet (lazy init)"}
-    mode = stat_.S_IMODE(paths.dir.stat().st_mode)
+    try:
+        mode = stat_.S_IMODE(paths.dir.stat().st_mode)
+    except OSError as exc:
+        return {
+            "name": "store_dir",
+            "status": "FAIL",
+            "detail": f"could not stat {paths.dir}: {exc}",
+        }
     if mode != 0o700:
         return {
             "name": "store_dir_mode",
@@ -58,11 +65,25 @@ def _check_store_dir(paths):
 def _check_secrets_file(paths):
     """Return (data, checks, fatal). `fatal=True` means stop further checks."""
     if not paths.file.exists():
-        empty = store.StoreData(schema_version=1, secrets=[])
+        empty = store.StoreData(schema_version=store.SCHEMA_VERSION, secrets=[])
         return empty, [{"name": "schema_version", "status": "PASS", "detail": "empty store"}], False
     checks = []
-    mode = stat_.S_IMODE(paths.file.stat().st_mode)
-    if mode != 0o600:
+    try:
+        mode = stat_.S_IMODE(paths.file.stat().st_mode)
+    except OSError as exc:
+        checks.append(
+            {
+                "name": "secrets_file_mode",
+                "status": "FAIL",
+                "detail": f"could not stat {paths.file}: {exc}",
+            }
+        )
+        return None, checks, True
+    if mode == 0o600:
+        checks.append(
+            {"name": "secrets_file_mode", "status": "PASS", "detail": f"{paths.file} mode 0o600"}
+        )
+    else:
         checks.append(
             {
                 "name": "secrets_file_mode",
@@ -74,6 +95,15 @@ def _check_secrets_file(paths):
         data = store.load()
     except store.StateError as exc:
         checks.append({"name": "schema_version", "status": "FAIL", "detail": str(exc)})
+        return None, checks, True
+    except OSError as exc:
+        checks.append(
+            {
+                "name": "schema_version",
+                "status": "FAIL",
+                "detail": f"could not read {paths.file}: {exc}",
+            }
+        )
         return None, checks, True
     checks.append({"name": "schema_version", "status": "PASS", "detail": f"v{data.schema_version}"})
     return data, checks, False

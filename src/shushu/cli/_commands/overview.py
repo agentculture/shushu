@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
-from shushu import alerts, store
-from shushu.cli._errors import ShushuError
+from shushu import alerts, fs, store
+from shushu.cli._errors import EXIT_USER_ERROR, ShushuError
 from shushu.cli._output import emit_result
 
 
 def handle(args) -> int:
     if getattr(args, "user", None) or getattr(args, "all_users", False):
         raise ShushuError(
-            66,
+            EXIT_USER_ERROR,
             "overview --user / --all-users not yet implemented",
             "coming in Task 26",
         )
-    data = store.load()
+    # Read-only: don't trigger store-dir creation if no store exists yet.
+    if not fs.user_store_paths().file.exists():
+        data = store.StoreData(schema_version=store.SCHEMA_VERSION, secrets=[])
+    else:
+        data = store.load()
     records = []
     for record in data.secrets:
         state = alerts.classify(record.alert_at)

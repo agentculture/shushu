@@ -58,9 +58,9 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd")
 
     # globals
-    sub.add_parser("doctor", help="Store health / integrity checks").add_argument(
-        "--json", action="store_true"
-    )
+    pdoc = sub.add_parser("doctor", help="Store health / integrity checks")
+    pdoc.add_argument("--json", action="store_true")
+    _add_admin_flags(pdoc)
     sub.add_parser("learn", help="Agent-authored self-teaching output").add_argument(
         "--json", action="store_true"
     )
