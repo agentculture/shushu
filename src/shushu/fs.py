@@ -46,9 +46,11 @@ def ensure_store_dir(paths: StorePaths | None = None) -> StorePaths:
     # Fix up if the dir pre-existed with a wrong mode.
     os.chmod(paths.dir, 0o700)
     # Pre-create an empty lockfile so fcntl has something to hold.
-    if not paths.lock.exists():
-        fd = os.open(paths.lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        os.close(fd)
+    # O_CREAT (without O_EXCL) is race-safe for concurrent first-run callers:
+    # both will open the file; the non-creating caller just gets an fd to
+    # the existing lockfile. The chmod below asserts mode 0600 regardless.
+    fd = os.open(paths.lock, os.O_CREAT | os.O_WRONLY, 0o600)
+    os.close(fd)
     os.chmod(paths.lock, 0o600)
     return paths
 

@@ -88,10 +88,19 @@ def _record_to_json(r: SecretRecord) -> dict[str, Any]:
 
 
 def _json_to_record(d: dict[str, Any]) -> SecretRecord:
+    hidden_raw = d["hidden"]
+    if not isinstance(hidden_raw, bool):
+        # Strict check: bool(non-bool) silently coerces (e.g. bool("false") is
+        # True), which would defeat the schema-enforced contract for hand-edited
+        # or corrupt stores. Reject anything that isn't an actual JSON bool.
+        raise StateError(
+            f"secret {d.get('name', '?')!r} has non-boolean hidden "
+            f"(got {type(hidden_raw).__name__})"
+        )
     return SecretRecord(
         name=d["name"],
         value=d["value"],
-        hidden=bool(d["hidden"]),
+        hidden=hidden_raw,
         source=d["source"],
         purpose=d.get("purpose", ""),
         rotation_howto=d.get("rotation_howto", ""),
@@ -135,10 +144,11 @@ def _paths() -> fs.StorePaths:
 def _load_raw_unlocked() -> StoreData:
     """Read + parse secrets.json without acquiring a lock.
 
-    Only safe to call from within a `locked_write()` context. The public
-    `load()` takes LOCK_SH; this helper assumes the caller already holds
-    LOCK_EX via locked_write and would deadlock if it tried LOCK_SH on
-    the same lockfile.
+    Caller must already hold either LOCK_SH (for read-only paths like
+    public `load()`) or LOCK_EX (for read-mutate-write cycles inside the
+    `set_secret` / `update_metadata` / `delete` functions). The
+    `_unlocked` suffix means "this function does not acquire a lock
+    itself", not "the file is unlocked when this runs".
     """
     paths = _paths()
     if not paths.file.exists():
@@ -158,9 +168,14 @@ def _load_raw_unlocked() -> StoreData:
             f"store schema_version={sv} but this binary supports {SCHEMA_VERSION}; "
             "upgrade shushu or file a migration issue"
         )
+    secrets_raw = raw.get("secrets", [])
+    if not isinstance(secrets_raw, list):
+        raise StateError(
+            f"secrets.json 'secrets' field must be a list " f"(got {type(secrets_raw).__name__})"
+        )
     try:
-        secrets = [_json_to_record(d) for d in raw.get("secrets", [])]
-    except (KeyError, ValueError) as exc:
+        secrets = [_json_to_record(d) for d in secrets_raw]
+    except (KeyError, ValueError, TypeError) as exc:
         raise StateError(f"secrets.json contains malformed record: {exc}")
     return StoreData(schema_version=SCHEMA_VERSION, secrets=secrets)
 
@@ -177,10 +192,13 @@ def _save_unlocked(data: StoreData) -> None:
 
 
 def load() -> StoreData:
-    """Public read path. Acquires shared lock; safe for concurrent readers."""
+    """Public read path. Acquires shared lock; safe for concurrent readers.
+
+    The existence check happens inside `_load_raw_unlocked()`, under the
+    lock, to avoid a TOCTOU where a concurrent writer creates the file
+    after we check `exists()` but before we read.
+    """
     paths = _paths()
-    if not paths.file.exists():
-        return StoreData(schema_version=SCHEMA_VERSION, secrets=[])
     with fs.locked_read(paths):
         return _load_raw_unlocked()
 

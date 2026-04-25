@@ -37,7 +37,11 @@ def emit_result(payload: Any, *, json_mode: bool, stream: IO[str] | None = None)
 
 
 def emit_error(err: ShushuError, *, json_mode: bool, stream: IO[str] | None = None) -> None:
-    stream = stream or sys.stderr
+    if stream is None:
+        # --json contract: one JSON object on stdout (success OR error), so
+        # callers can `payload = json.loads(proc.stdout)` regardless of exit
+        # code. Text mode keeps errors on stderr so stdout stays clean.
+        stream = sys.stdout if json_mode else sys.stderr
     if json_mode:
         payload = {
             "ok": False,

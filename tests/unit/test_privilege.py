@@ -21,13 +21,13 @@ def test_require_root_raises_privilege_error_when_not_root(monkeypatch):
     assert "shushu" in exc.value.remediation
 
 
-def test_sudo_invoker_falls_back_to_getuid_when_SUDO_USER_unset(monkeypatch):
+def test_sudo_invoker_falls_back_to_getuid_when_sudo_user_unset(monkeypatch):
     monkeypatch.delenv("SUDO_USER", raising=False)
     name = privilege.sudo_invoker()
     assert name  # never empty
 
 
-def test_sudo_invoker_prefers_SUDO_USER_when_set(monkeypatch):
+def test_sudo_invoker_prefers_sudo_user_when_set(monkeypatch):
     monkeypatch.setenv("SUDO_USER", "alice")
     assert privilege.sudo_invoker() == "alice"
 

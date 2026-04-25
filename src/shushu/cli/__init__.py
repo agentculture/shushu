@@ -22,7 +22,9 @@ from shushu.cli._commands import (
     run,
 )
 from shushu.cli._commands import set as set_cmd
-from shushu.cli._commands import show
+from shushu.cli._commands import (
+    show,
+)
 from shushu.cli._errors import (
     EXIT_INTERNAL,
     EXIT_PRIVILEGE,

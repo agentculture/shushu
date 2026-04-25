@@ -186,3 +186,41 @@ def test_utf8_roundtrip():
     )
     rec = store.load().secrets[0]
     assert rec.value == "pa$$wörd-日本語-🔑"
+
+
+def test_load_raw_rejects_non_list_secrets():
+    paths = store._paths()
+    paths.dir.mkdir(parents=True, exist_ok=True)
+    paths.file.write_text(json.dumps({"schema_version": 1, "secrets": None}))
+    with pytest.raises(store.StateError) as exc:
+        store.load()
+    assert "must be a list" in str(exc.value)
+
+
+def test_load_raw_rejects_non_bool_hidden():
+    paths = store._paths()
+    paths.dir.mkdir(parents=True, exist_ok=True)
+    paths.file.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "secrets": [
+                    {
+                        "name": "FOO",
+                        "value": "v",
+                        "hidden": "false",
+                        "source": "localhost",
+                        "purpose": "",
+                        "rotation_howto": "",
+                        "alert_at": None,
+                        "handed_over_by": None,
+                        "created_at": "2026-04-24T12:00:00Z",
+                        "updated_at": "2026-04-24T12:00:00Z",
+                    }
+                ],
+            }
+        )
+    )
+    with pytest.raises(store.StateError) as exc:
+        store.load()
+    assert "non-boolean hidden" in str(exc.value)

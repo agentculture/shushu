@@ -6,7 +6,24 @@ with merged PRs per the per-PR version bump discipline documented in
 
 ## [Unreleased]
 
-- (nothing yet — v0.3.0 cut; next bump on the following PR)
+- (nothing yet — v0.3.1 cut; next bump on the following PR)
+
+## [0.3.1] — 2026-04-24
+
+### Fixed
+
+- **CI tests pipeline running again.** The `tests` workflow had been silently failing at workflow-validation time on every run since PR #2, because the `if: hashFiles('tests/integration/**') != ''` gate added on the `integration` job is rejected by GitHub Actions before any job starts (visible as a 0s "workflow file issue"). Removed the `integration` job entirely; it returns in Task 26 once `tests/integration/` exists. lint / unit / version-check now actually run on every PR.
+- `store.load()` TOCTOU: dropped the `paths.file.exists()` precheck outside the lock; existence is now decided inside `_load_raw_unlocked()` under `LOCK_SH`. (Copilot, Qodo)
+- `_json_to_record()` strict bool check on `hidden`: `bool("false")` is truthy and previously coerced corrupt stores into "hidden" silently. Now raises `StateError`. (Copilot)
+- `_load_raw_unlocked()` validates the `secrets` field is a list and catches `TypeError` from malformed records, so non-list / non-dict input surfaces as `StateError` instead of bypassing the schema-enforced contract. (Copilot)
+- `fs.ensure_store_dir()` lockfile creation no longer races: dropped `O_EXCL` and the `exists()` precheck so concurrent first-run callers don't crash with `FileExistsError`. (Qodo)
+- `cli/_output.py::emit_error` now defaults to `sys.stdout` when `json_mode=True` (and `sys.stderr` otherwise). The `--json` contract — one JSON object on stdout for both success and error responses — was previously broken for errors. (Copilot, Qodo)
+- `tests/unit/test_users.py` now compares against `os.geteuid()` to match `users.current()`'s implementation; previously the test would have failed under any `setuid`/sudo scenario where `uid != euid`. (Copilot)
+- `tests/unit/test_privilege.py`: renamed two test functions whose names contained uppercase `SUDO_USER` to satisfy `python:S1542` (snake_case convention). (SonarCloud)
+
+### Tests
+
+- Added regression tests for non-list `secrets`, non-bool `hidden`, and `emit_error` default-stream behavior in both modes.
 
 ## [0.3.0] — 2026-04-24
 
