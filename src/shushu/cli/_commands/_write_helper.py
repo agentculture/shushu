@@ -10,13 +10,24 @@ from shushu import store
 from shushu.cli._errors import EXIT_USER_ERROR, ShushuError
 
 
-def write_value(args, value: str, alert_at):
+def write_value(
+    args,
+    value: str,
+    alert_at,
+    *,
+    default_source: str = "localhost",
+    default_handed_over_by: str | None = None,
+):
     """Create-or-overwrite a record with `value`.
 
     On overwrite: preserve `source`, `hidden`, and `handed_over_by` from the
-    existing record; reject any explicit attempt to change them. On create:
-    `source` defaults to `"localhost"`, `hidden` defaults to `args.hidden`,
-    `handed_over_by` is None.
+    existing record; reject any explicit attempt to change them.
+
+    On create: `source` defaults to `args.source or default_source`,
+    `hidden` defaults to `args.hidden`, `handed_over_by = default_handed_over_by`.
+    The two `default_*` kwargs are how the admin path injects
+    `default_source = f"admin:{invoker}"` and `default_handed_over_by = invoker`
+    without duplicating the create/overwrite logic.
 
     Mutable metadata fields (`purpose`, `rotation_howto`, `alert_at`) follow
     the "user-supplied wins; otherwise inherit from existing" rule.
@@ -52,9 +63,9 @@ def write_value(args, value: str, alert_at):
         name=args.name,
         value=value,
         hidden=args.hidden,
-        source=args.source or "localhost",
+        source=args.source or default_source,
         purpose=args.purpose or "",
         rotation_howto=args.rotate_howto or "",
         alert_at=alert_at,
-        handed_over_by=None,
+        handed_over_by=default_handed_over_by,
     )
