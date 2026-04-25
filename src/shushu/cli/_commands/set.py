@@ -15,7 +15,8 @@ from shushu.cli._output import emit_result
 
 
 def handle(args) -> int:
-    _check_admin(args)
+    if args.user is not None:
+        return _handle_admin_user(args)
     alert_at = _parse_alert_at(args)
     _check_admin_source_prefix(args.source)
     if args.value is not None:
@@ -26,15 +27,71 @@ def handle(args) -> int:
     return 0
 
 
-def _check_admin(args) -> None:
-    if args.user is None:
-        return
-    privilege.require_root(_rebuild_admin_tail(args))
-    raise ShushuError(
-        EXIT_USER_ERROR,
-        "set --user not yet implemented",
-        "coming in Task 26 (integration task)",
-    )
+def _handle_admin_user(args) -> int:
+    import os as _os
+
+    from shushu import admin
+
+    handed_over_by = privilege.sudo_invoker()
+    source = args.source or f"admin:{handed_over_by}"
+    # Snapshot all arg values needed inside the child closure.
+    arg_name = args.name
+    arg_value = args.value
+    arg_purpose = args.purpose
+    arg_rotate_howto = args.rotate_howto
+    arg_alert_at = args.alert_at
+    arg_hidden = args.hidden
+    json_mode = args.json
+
+    def _child() -> int:
+        _os.environ.pop("SHUSHU_HOME", None)
+        try:
+            alert_at_c = alerts.parse_date(arg_alert_at)
+        except ValueError as exc:
+            raise ShushuError(
+                EXIT_USER_ERROR,
+                f"invalid date: {arg_alert_at!r}",
+                "use YYYY-MM-DD",
+            ) from exc
+        if arg_value is None:
+            rec = store.update_metadata(
+                name=arg_name,
+                purpose=arg_purpose,
+                rotation_howto=arg_rotate_howto,
+                alert_at=alert_at_c,
+            )
+        else:
+            value_c = _read_value(arg_value)
+            try:
+                existing = store.get_record(arg_name)
+            except store.NotFoundError:
+                existing = None
+            if existing is not None:
+                rec = store.set_secret(
+                    name=arg_name,
+                    value=value_c,
+                    hidden=existing.hidden,
+                    source=existing.source,
+                    purpose=arg_purpose or existing.purpose,
+                    rotation_howto=arg_rotate_howto or existing.rotation_howto,
+                    alert_at=alert_at_c if alert_at_c is not None else existing.alert_at,
+                    handed_over_by=existing.handed_over_by,
+                )
+            else:
+                rec = store.set_secret(
+                    name=arg_name,
+                    value=value_c,
+                    hidden=arg_hidden,
+                    source=source,
+                    purpose=arg_purpose or "",
+                    rotation_howto=arg_rotate_howto or "",
+                    alert_at=alert_at_c,
+                    handed_over_by=handed_over_by,
+                )
+        _emit_ok(rec, json_mode)
+        return 0
+
+    return admin.as_user(args.user, _child)
 
 
 def _parse_alert_at(args):

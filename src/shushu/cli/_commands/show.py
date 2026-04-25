@@ -3,18 +3,35 @@
 from __future__ import annotations
 
 from shushu import store
-from shushu.cli._errors import EXIT_USER_ERROR, ShushuError
 from shushu.cli._output import emit_result
 
 
 def handle(args) -> int:
     if args.user is not None:
-        raise ShushuError(
-            EXIT_USER_ERROR,
-            "show --user not yet implemented",
-            "coming in Task 26",
-        )
+        return _handle_admin_user(args)
     rec = store.get_record(args.name)  # NotFoundError wrapped by main()
+    _emit_record(rec, args.json)
+    return 0
+
+
+def _handle_admin_user(args) -> int:
+    import os as _os
+
+    from shushu import admin
+
+    target_name = args.name
+    json_mode = args.json
+
+    def _child() -> int:
+        _os.environ.pop("SHUSHU_HOME", None)
+        rec = store.get_record(target_name)
+        _emit_record(rec, json_mode)
+        return 0
+
+    return admin.as_user(args.user, _child)
+
+
+def _emit_record(rec, json_mode: bool) -> None:
     payload = {
         "name": rec.name,
         "hidden": rec.hidden,
@@ -26,9 +43,8 @@ def handle(args) -> int:
         "created_at": rec.created_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "updated_at": rec.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
-    if args.json:
+    if json_mode:
         emit_result(payload, json_mode=True)
     else:
         for k, v in payload.items():
             print(f"{k}: {v}")
-    return 0
