@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
+import subprocess  # noqa: S404
 import sys
 
 import pytest
@@ -24,9 +24,9 @@ _TEST_USER = "shushutest_carol"
 @pytest.fixture(scope="module")
 def carol_with_secret():
     """Create carol, write a secret as her, yield her name, then tear down."""
-    subprocess.run(["useradd", "-m", _TEST_USER], check=True)
+    subprocess.run(["useradd", "-m", _TEST_USER], check=True)  # noqa: S603, S607
     try:
-        subprocess.run(
+        subprocess.run(  # noqa: S603, S607
             [
                 "sudo",
                 "-u",
@@ -44,11 +44,11 @@ def carol_with_secret():
         )
         yield _TEST_USER
     finally:
-        subprocess.run(["userdel", "-r", _TEST_USER], check=False)
+        subprocess.run(["userdel", "-r", _TEST_USER], check=False)  # noqa: S603, S607
 
 
 def _shushu(*args):
-    return subprocess.run(
+    return subprocess.run(  # noqa: S603
         [sys.executable, "-m", "shushu", *args],
         capture_output=True,
         text=True,

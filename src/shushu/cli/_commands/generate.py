@@ -94,9 +94,7 @@ def _handle_admin_user(args) -> int:
             emit_result(payload, json_mode=True)
         else:
             if rec.hidden:
-                print(
-                    f"shushu: generated {rec.name} (hidden, {arg_nbytes} bytes {arg_encoding})"
-                )
+                print(f"shushu: generated {rec.name} (hidden, {arg_nbytes} bytes {arg_encoding})")
             else:
                 print(f"shushu: generated {rec.name} ({arg_nbytes} bytes {arg_encoding})")
                 print(rec.value)

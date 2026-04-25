@@ -39,18 +39,16 @@ def _handle_all_users(args) -> int:
         return {"user": info.name, "checks": report, "summary": summary}
 
     rows = admin.for_each_user(_row)
+    any_fail = any(row["summary"]["fail"] > 0 for row in rows)
     if json_mode:
         emit_result({"users": rows}, json_mode=True)
     else:
-        any_fail = False
         for row in rows:
             print(f"# {row['user']}")
             for c in row["checks"]:
                 print(f"  [{c['status']}] {c['name']}: {c['detail']}")
             s = row["summary"]
             print(f"  pass={s['pass']} warn={s['warn']} fail={s['fail']}")
-            if s["fail"] > 0:
-                any_fail = True
     return 0 if not any_fail else EXIT_STATE
 
 

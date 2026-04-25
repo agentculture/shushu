@@ -11,7 +11,7 @@ import os
 import pathlib
 import pwd
 import stat
-import subprocess
+import subprocess  # noqa: S404
 import sys
 
 import pytest
@@ -27,16 +27,16 @@ def two_users():
     """Create two throwaway OS users. Destroyed at module teardown."""
     names = ["shushutest_alice", "shushutest_bob"]
     for n in names:
-        subprocess.run(["useradd", "-m", n], check=True)
+        subprocess.run(["useradd", "-m", n], check=True)  # noqa: S603, S607
     try:
         yield names
     finally:
         for n in names:
-            subprocess.run(["userdel", "-r", n], check=False)
+            subprocess.run(["userdel", "-r", n], check=False)  # noqa: S603, S607
 
 
 def _shushu(*args, env=None):
-    return subprocess.run(
+    return subprocess.run(  # noqa: S603
         [sys.executable, "-m", "shushu", *args],
         capture_output=True,
         text=True,
@@ -119,7 +119,7 @@ def test_target_user_can_inspect_not_admin_field(two_users):
     alice, _ = two_users
     _shushu("set", "--user", alice, "FOO", "v")
     # Drop to alice and run show.
-    r = subprocess.run(
+    r = subprocess.run(  # noqa: S603, S607
         ["sudo", "-u", alice, sys.executable, "-m", "shushu", "show", "FOO", "--json"],
         capture_output=True,
         text=True,

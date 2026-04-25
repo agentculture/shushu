@@ -14,7 +14,15 @@ from shushu.cli._errors import EXIT_BACKEND, ShushuError
 
 
 def as_user(name: str, fn: Callable[[], int]) -> int:
-    """Run fn() as the target user via fork + setuid. Returns the child's exit code."""
+    """Run fn() as the target user via fork + setuid. Returns the child's exit code.
+
+    Sets HOME to the target user's home directory in the child environment
+    so that Path.home() resolves correctly after the uid switch. Each fn
+    closure is still responsible for popping SHUSHU_HOME before calling
+    store.* functions.
+    """
+    import os as _os
+
     privilege.require_root(f"--user {name}")
     try:
         info = users.resolve(name)
@@ -30,7 +38,12 @@ def as_user(name: str, fn: Callable[[], int]) -> int:
             f"user {name!r} has no home directory",
             "create one or pick a different user",
         )
-    return privilege.run_as_user(info, fn)
+
+    def _wrapped() -> int:
+        _os.environ["HOME"] = str(info.home)
+        return fn()
+
+    return privilege.run_as_user(info, _wrapped)
 
 
 def for_each_user(
