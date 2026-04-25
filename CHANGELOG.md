@@ -6,7 +6,19 @@ with merged PRs per the per-PR version bump discipline documented in
 
 ## [Unreleased]
 
-- (nothing yet — v0.4.0 cut; next bump on the following PR)
+- (nothing yet — v0.5.0 cut; next bump on the following PR)
+
+## [0.5.0] — 2026-04-25
+
+### Added
+
+- `shushu set NAME [value] [--flags]` — first write-surface verb. With value: create or update (writes value + metadata); use `-` for value to read from stdin (preferred for real secrets, strips one trailing newline). Without value: metadata-only update via `store.update_metadata` (`--purpose` / `--rotate-howto` / `--alert-at`). On overwrite, `source` and `hidden` are immutable post-create — attempts to change them exit 64 with a remediation pointing to `delete + re-create`. Refuses `--source admin:*` from non-root callers (reserved for sudo handoff). `--user` raises a structured `not yet implemented` error pending Task 26 (after `privilege.require_root` guard, so non-root invocations get the standard EXIT_PRIVILEGE 66).
+- `shushu generate NAME [--bytes N] [--encoding hex|base64] [--flags]` — random secret generation via `shushu.generate.random_secret`. Defaults to 32 bytes hex. `--hidden` makes the value write-only-via-inject: text mode never prints it; JSON mode omits the `value` field. Reuses `store.set_secret` so it inherits the same write path as `set`. Same `admin:*` source rejection and `--user` deferral as `set`.
+- `shushu show NAME [--json] [--user NAME]` — metadata-only read. **Never** prints `value`. Text mode prints `key: value` lines per metadata field; `--json` emits the structured dict. Missing record bubbles `store.NotFoundError` to main()'s wrapping → exit 64 with `see: shushu list`.
+
+### Tests
+
+- 15 new unit tests across `set` (9), `generate` (4), `show` (2). Total: 92 tests passing.
 
 ## [0.4.0] — 2026-04-25
 

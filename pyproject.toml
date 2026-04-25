@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "shushu"
-version = "0.4.0"
+version = "0.5.0"
 description = "shushu CLI"
 readme = "README.md"
 license = { text = "MIT" }
@@ -47,7 +47,15 @@ line_length = 100
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+# Pin pytest's tmp roots under /tmp/shushu-tests/ so cleanup is one-step
+# (rm -rf /tmp/shushu-tests/) instead of hunting through /tmp/pytest-of-*.
+# `tmp_path_retention_policy = "none"` deletes a test's tmp_path
+# immediately after it passes; failed-test artifacts are retained by
+# default (`policy = "failed"` is the implicit upgrade if you set
+# retention_count explicitly).
+addopts = "-ra --basetemp=/tmp/shushu-tests"
+tmp_path_retention_policy = "failed"
+tmp_path_retention_count = 3
 markers = [
     "integration: integration tests that require real OS user management (setuid-fork, useradd/userdel). Gated by SHUSHU_DOCKER=1 and usually run in a disposable container.",
 ]
