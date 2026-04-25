@@ -58,8 +58,10 @@ Read-only setup / permission / schema integrity checks.
 
 - `0` if no FAIL checks.
 - `65` (`EXIT_STATE`) if any FAIL check.
-- `64` if `--user` / `--all-users` and the operation is not yet
-  applicable (or, in self-mode, if the flags are passed without sudo).
+- `66` (`EXIT_PRIVILEGE`) if `--user` / `--all-users` is passed
+  without root.
+- `67` (`EXIT_BACKEND`) if `--user NAME` resolves to an unknown OS
+  user.
 
 JSON success:
 

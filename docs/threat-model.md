@@ -117,9 +117,10 @@ and stamped into the child's env, never on the command line.
 
 ### 6. Input validation
 
-- Names are validated against `^[A-Z][A-Z0-9_]*$` in
-  `store._validate_name`. Lowercase, dashes, dots, etc. are rejected
-  (env-var-unsafe forms).
+- Names are validated against `^[A-Z_][A-Z0-9_]{0,63}$` in
+  `store._validate_name` (compiled as `store.NAME_RE`). Lowercase,
+  dashes, dots, and names longer than 64 characters are rejected
+  (env-var-unsafe forms); leading `_` is allowed.
 - `shushu env` single-quotes values and escapes embedded `'` as
   `'\''` (POSIX-safe). Round-trip through `bash -c` is asserted by
   `test_env_escapes_single_quotes_posix_safe`.
@@ -133,7 +134,7 @@ and stamped into the child's env, never on the command line.
 |---|---|
 | Plaintext at rest in `secrets.json` | Tracked as the encryption-at-rest issue (see below); v1.x candidate. |
 | Root can `cat` any user's secrets directly | CLI surface doesn't expose values via admin verbs; accepted (root is by definition trusted). |
-| Orphan stores after user deletion | `doctor --all-users` enumerates orphan stores; cleanup verb deferred to a future v1.x release. |
+| Orphan stores after user deletion | Not detected in 0.x. `doctor --all-users` enumerates `users.all_users()`, so a store left on disk after the OS user is deleted is invisible. Filesystem-scan-based detection + a cleanup verb deferred to a future v1.x release. |
 | setuid-fork TOCTOU with concurrent `usermod` | Accepted on trusted-admin host. |
 | Shell-history leakage of literal `set NAME value` | Stdin form (`set NAME -`) is the documented preferred shape; covered in `shushu explain set`. |
 
