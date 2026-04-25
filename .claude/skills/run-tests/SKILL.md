@@ -19,7 +19,15 @@ This script adds:
 - A `--clean` flag to wipe `/tmp/shushu-tests/` after the run regardless
   of outcome.
 - A `--clean-only` mode for one-shot cleanup without running anything.
+- A `--clean-smoke <name>` mode for wiping a single smoke namespace
+  (`/tmp/shushu-tests/smoke-<name>/`) without touching the rest.
+- A `--smoke-home <name>` mode that prints the canonical smoke path so
+  shells can do `SHUSHU_HOME="$(bash test.sh --smoke-home task22)"`
+  without anyone writing `/tmp/shushu-tests/smoke-task22` by hand.
 - Standard `--parallel` / `--coverage` / `--ci` / `--quick` modes.
+
+The smoke flags exist so manual smoke flows never need a direct
+`rm -rf` against `/tmp/shushu-tests/*`. Always go through the wrapper.
 
 ## Usage
 
@@ -51,8 +59,10 @@ bash .claude/skills/run-tests/scripts/test.sh -p --clean
 | `--coverage`   | `-c` | `--cov=shushu --cov-report=term` |
 | `--ci`         |      | parallel + coverage + xml + verbose (mirrors `.github/workflows/tests.yml`) |
 | `--quick`      | `-q` | quiet output, no coverage |
-| `--clean`      | `-k` | `rm -rf /tmp/shushu-tests/` after the run, regardless of pass/fail |
+| `--clean`      | `-k` | wipe `/tmp/shushu-tests/` after the run, regardless of pass/fail |
 | `--clean-only` |      | wipe `/tmp/shushu-tests/` and exit (no test run) |
+| `--clean-smoke NAME` |  | wipe `/tmp/shushu-tests/smoke-NAME/` only and exit |
+| `--smoke-home NAME` |   | print `/tmp/shushu-tests/smoke-NAME` and exit (use to set `SHUSHU_HOME`) |
 
 Extra positional arguments pass through to pytest verbatim
 (`-x` to stop on first failure, `-k "pattern"` to filter, etc.).

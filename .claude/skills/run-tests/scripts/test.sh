@@ -12,12 +12,17 @@
 #   --clean,       -k   Clean /tmp/shushu-tests/ AFTER the run, regardless of outcome
 #                       (default: pytest's tmp_path_retention_policy=failed keeps the
 #                        last 3 failed-test trees for inspection)
-#   --clean-only        Don't run anything — just rm -rf /tmp/shushu-tests/ and exit
+#   --clean-only        Don't run anything — just wipe /tmp/shushu-tests/ and exit
+#   --clean-smoke NAME  Don't run anything — wipe /tmp/shushu-tests/smoke-NAME/ and exit.
+#                       Spares manual `rm -rf` calls in shell smoke flows.
+#   --smoke-home NAME   Don't run anything — print /tmp/shushu-tests/smoke-NAME and exit.
+#                       Use as: SHUSHU_HOME="$(bash test.sh --smoke-home task22)" uv run shushu ...
 #
 # Extra args are passed through to pytest (e.g. -x, -k "pattern").
 #
 # pyproject.toml already pins --basetemp=/tmp/shushu-tests so EVERY tmp_path
-# allocation is rooted there. Cleanup is a single rm -rf away.
+# allocation is rooted there. Cleanup is one wrapper invocation away — never
+# write a direct `rm -rf` against /tmp/shushu-tests/* from a shell.
 
 set -euo pipefail
 
@@ -28,20 +33,34 @@ CI_MODE=""
 QUIET=""
 CLEAN=""
 CLEAN_ONLY=""
+CLEAN_SMOKE=""
+SMOKE_HOME=""
 EXTRA_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --parallel|-p)  PARALLEL=1; shift ;;
-        --coverage|-c)  COVERAGE=1; shift ;;
-        --ci)           CI_MODE=1; shift ;;
-        --quick|-q)     QUIET=1; shift ;;
-        --clean|-k)     CLEAN=1; shift ;;
-        --clean-only)   CLEAN_ONLY=1; shift ;;
+        --parallel|-p)    PARALLEL=1; shift ;;
+        --coverage|-c)    COVERAGE=1; shift ;;
+        --ci)             CI_MODE=1; shift ;;
+        --quick|-q)       QUIET=1; shift ;;
+        --clean|-k)       CLEAN=1; shift ;;
+        --clean-only)     CLEAN_ONLY=1; shift ;;
+        --clean-smoke)
+            if [[ $# -lt 2 || -z "${2-}" ]]; then
+                echo "[run-tests] error: --clean-smoke requires a NAME argument" >&2
+                exit 2
+            fi
+            CLEAN_SMOKE="$2"; shift 2 ;;
+        --smoke-home)
+            if [[ $# -lt 2 || -z "${2-}" ]]; then
+                echo "[run-tests] error: --smoke-home requires a NAME argument" >&2
+                exit 2
+            fi
+            SMOKE_HOME="$2"; shift 2 ;;
         --help|-h)
             sed -n '2,/^$/p' "$0" | sed 's/^# \?//'
             exit 0 ;;
-        *)              EXTRA_ARGS+=("$1"); shift ;;
+        *)                EXTRA_ARGS+=("$1"); shift ;;
     esac
 done
 
@@ -52,6 +71,39 @@ cleanup() {
     fi
     return 0
 }
+
+clean_smoke_namespace() {
+    local name="$1"
+    # Defensive: refuse names that try to escape the smoke namespace.
+    case "$name" in
+        ""|*/*|..|.|*$'\n'*)
+            echo "[run-tests] invalid smoke name: $name" >&2
+            return 2 ;;
+        *) ;;  # accepted name; fall through
+    esac
+    local target="$ROOT/smoke-$name"
+    if [[ -d "$target" ]]; then
+        rm -rf "$target"
+        echo "[run-tests] cleaned $target"
+    fi
+    return 0
+}
+
+if [[ -n "$SMOKE_HOME" ]]; then
+    case "$SMOKE_HOME" in
+        ""|*/*|..|.|*$'\n'*)
+            echo "[run-tests] invalid smoke name: $SMOKE_HOME" >&2
+            exit 2 ;;
+        *) ;;  # accepted name; fall through
+    esac
+    echo "$ROOT/smoke-$SMOKE_HOME"
+    exit 0
+fi
+
+if [[ -n "$CLEAN_SMOKE" ]]; then
+    clean_smoke_namespace "$CLEAN_SMOKE"
+    exit 0
+fi
 
 if [[ -n "$CLEAN_ONLY" ]]; then
     cleanup
