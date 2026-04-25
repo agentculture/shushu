@@ -13,15 +13,23 @@ from shushu import privilege, users
 from shushu.cli._errors import EXIT_BACKEND, ShushuError
 
 
-def as_user(name: str, fn: Callable[[], int]) -> int:
+def as_user(name: str, fn: Callable[[], int], *, json_mode: bool = False) -> int:
     """Run fn() as the target user via fork + setuid. Returns the child's exit code.
 
     Sets HOME to the target user's home directory in the child environment
     so that Path.home() resolves correctly after the uid switch. Each fn
     closure is still responsible for popping SHUSHU_HOME before calling
     store.* functions.
+
+    Translates ShushuError and store.* exceptions raised inside fn() to
+    proper exit codes via cli._translate.translate_errors, so common
+    failures (invalid date, missing record, hidden value request) produce
+    the same structured output as self-mode instead of being caught by
+    privilege.run_as_user's generic Exception handler as EXIT_INTERNAL.
     """
     import os as _os
+
+    from shushu.cli._translate import translate_errors
 
     privilege.require_root(f"--user {name}")
     try:
@@ -41,7 +49,7 @@ def as_user(name: str, fn: Callable[[], int]) -> int:
 
     def _wrapped() -> int:
         _os.environ["HOME"] = str(info.home)
-        return fn()
+        return translate_errors(fn, json_mode=json_mode)
 
     return privilege.run_as_user(info, _wrapped)
 
@@ -59,7 +67,7 @@ def for_each_user(
     for info in users.all_users():
         if not info.home.exists():
             continue
-        if not (info.home / ".local/share/shushu/secrets.json").exists():
+        if not store_paths_for(info).file.exists():
             continue
         row = fn(info)
         if row is not None:

@@ -72,7 +72,7 @@ def _handle_admin_user(args) -> int:
             print(f"pass={s['pass']} warn={s['warn']} fail={s['fail']}")
         return 0 if payload["summary"]["fail"] == 0 else EXIT_STATE
 
-    return admin.as_user(args.user, _child)
+    return admin.as_user(args.user, _child, json_mode=args.json)
 
 
 def _run_self_checks():
@@ -115,9 +115,12 @@ def _check_store_dir(paths):
 def _check_secrets_file_at(paths):
     """Return (data, checks, fatal). `fatal=True` means stop further checks.
 
-    Reads `paths.file` directly so root can inspect any user's store without
-    forking. Uses `store.load()` for self-mode (correct lock path), and
-    direct JSON parsing for foreign-user paths (root reads files directly).
+    Reads and parses `paths.file` directly for any provided `StorePaths`.
+    This does NOT call `store.load()` and does NOT take a lock — it
+    performs direct JSON validation/parsing so root can inspect any user's
+    store without forking, and so the same logic works for self-mode and
+    foreign-user paths uniformly. The corresponding `_check_record` helper
+    runs against the parsed `StoreData`.
     """
     import json as _json
 
@@ -185,11 +188,11 @@ def _parse_store_data(raw: dict) -> store.StoreData:
     """Parse a JSON dict into StoreData without going through store.load().
 
     Lets root read any user's secrets.json directly (no fork, no lock) for
-    the --all-users doctor path.
+    the --all-users doctor path. Uses the public `store.record_from_json`
+    helper so the per-record schema validation stays consistent with
+    `store.load()`.
     """
-    from shushu.store import _json_to_record  # type: ignore[attr-defined]
-
-    secrets = [_json_to_record(d) for d in raw.get("secrets", [])]
+    secrets = [store.record_from_json(d) for d in raw.get("secrets", [])]
     return store.StoreData(schema_version=store.SCHEMA_VERSION, secrets=secrets)
 
 

@@ -7,11 +7,31 @@ Without value: update mutable metadata only.
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 
 from shushu import alerts, privilege, store
 from shushu.cli._commands._write_helper import write_value
 from shushu.cli._errors import EXIT_USER_ERROR, ShushuError
 from shushu.cli._output import emit_result
+
+
+@dataclass(frozen=True)
+class _AdminSetSnapshot:
+    """Snapshot of args needed inside the admin fork-child closure.
+
+    Decouples the closure from the argparse Namespace so the child
+    holds only plain values (no shared mutable state with the parent).
+    """
+
+    name: str
+    value: str | None
+    purpose: str | None
+    rotate_howto: str | None
+    alert_at: str | None
+    hidden: bool
+    json_mode: bool
+    source: str
+    handed_over_by: str
 
 
 def handle(args) -> int:
@@ -33,65 +53,81 @@ def _handle_admin_user(args) -> int:
     from shushu import admin
 
     handed_over_by = privilege.sudo_invoker()
-    source = args.source or f"admin:{handed_over_by}"
+    admin_source = args.source or f"admin:{handed_over_by}"
     # Snapshot all arg values needed inside the child closure.
-    arg_name = args.name
-    arg_value = args.value
-    arg_purpose = args.purpose
-    arg_rotate_howto = args.rotate_howto
-    arg_alert_at = args.alert_at
-    arg_hidden = args.hidden
-    json_mode = args.json
+    snap = _AdminSetSnapshot(
+        name=args.name,
+        value=args.value,
+        purpose=args.purpose,
+        rotate_howto=args.rotate_howto,
+        alert_at=args.alert_at,
+        hidden=args.hidden,
+        json_mode=args.json,
+        source=admin_source,
+        handed_over_by=handed_over_by,
+    )
 
     def _child() -> int:
         _os.environ.pop("SHUSHU_HOME", None)
-        try:
-            alert_at_c = alerts.parse_date(arg_alert_at)
-        except ValueError as exc:
-            raise ShushuError(
-                EXIT_USER_ERROR,
-                f"invalid date: {arg_alert_at!r}",
-                "use YYYY-MM-DD",
-            ) from exc
-        if arg_value is None:
+        alert_at_c = _parse_alert_at_raw(snap.alert_at)
+        if snap.value is None:
             rec = store.update_metadata(
-                name=arg_name,
-                purpose=arg_purpose,
-                rotation_howto=arg_rotate_howto,
+                name=snap.name,
+                purpose=snap.purpose,
+                rotation_howto=snap.rotate_howto,
                 alert_at=alert_at_c,
             )
         else:
-            value_c = _read_value(arg_value)
-            try:
-                existing = store.get_record(arg_name)
-            except store.NotFoundError:
-                existing = None
-            if existing is not None:
-                rec = store.set_secret(
-                    name=arg_name,
-                    value=value_c,
-                    hidden=existing.hidden,
-                    source=existing.source,
-                    purpose=arg_purpose or existing.purpose,
-                    rotation_howto=arg_rotate_howto or existing.rotation_howto,
-                    alert_at=alert_at_c if alert_at_c is not None else existing.alert_at,
-                    handed_over_by=existing.handed_over_by,
-                )
-            else:
-                rec = store.set_secret(
-                    name=arg_name,
-                    value=value_c,
-                    hidden=arg_hidden,
-                    source=source,
-                    purpose=arg_purpose or "",
-                    rotation_howto=arg_rotate_howto or "",
-                    alert_at=alert_at_c,
-                    handed_over_by=handed_over_by,
-                )
-        _emit_ok(rec, json_mode)
+            rec = _admin_create_or_overwrite(snap, _read_value(snap.value), alert_at_c)
+        _emit_ok(rec, snap.json_mode)
         return 0
 
-    return admin.as_user(args.user, _child)
+    return admin.as_user(args.user, _child, json_mode=args.json)
+
+
+def _parse_alert_at_raw(raw):
+    try:
+        return alerts.parse_date(raw)
+    except ValueError as exc:
+        raise ShushuError(
+            EXIT_USER_ERROR,
+            f"invalid date: {raw!r}",
+            "use YYYY-MM-DD",
+        ) from exc
+
+
+def _admin_create_or_overwrite(snap, value, alert_at_c):
+    """Create or overwrite under target uid (admin path).
+
+    Mirrors `_write_helper.write_value`'s preserve-immutables semantics
+    but uses the admin-supplied `source` and `handed_over_by` defaults
+    on the create branch.
+    """
+    try:
+        existing = store.get_record(snap.name)
+    except store.NotFoundError:
+        existing = None
+    if existing is not None:
+        return store.set_secret(
+            name=snap.name,
+            value=value,
+            hidden=existing.hidden,
+            source=existing.source,
+            purpose=snap.purpose or existing.purpose,
+            rotation_howto=snap.rotate_howto or existing.rotation_howto,
+            alert_at=alert_at_c if alert_at_c is not None else existing.alert_at,
+            handed_over_by=existing.handed_over_by,
+        )
+    return store.set_secret(
+        name=snap.name,
+        value=value,
+        hidden=snap.hidden,
+        source=snap.source,
+        purpose=snap.purpose or "",
+        rotation_howto=snap.rotate_howto or "",
+        alert_at=alert_at_c,
+        handed_over_by=snap.handed_over_by,
+    )
 
 
 def _parse_alert_at(args):

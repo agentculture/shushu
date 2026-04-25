@@ -27,14 +27,21 @@ pytestmark = [
 
 @pytest.fixture(scope="module")
 def two_users():
-    """Create two throwaway OS users. Destroyed at module teardown."""
+    """Create two throwaway OS users. Destroyed at module teardown.
+
+    Track which users were *successfully* created so a partial-creation
+    failure (first useradd OK, second fails) still cleans up the first
+    on teardown instead of leaking it.
+    """
     names = ["shushutest_alice", "shushutest_bob"]
-    for n in names:
-        subprocess.run(["useradd", "-m", n], check=True)  # noqa: S603, S607
+    created: list[str] = []
     try:
+        for n in names:
+            subprocess.run(["useradd", "-m", n], check=True)  # noqa: S603, S607
+            created.append(n)
         yield names
     finally:
-        for n in names:
+        for n in reversed(created):
             subprocess.run(["userdel", "-r", n], check=False)  # noqa: S603, S607
 
 
@@ -140,3 +147,25 @@ def test_no_root_owned_files_left_behind(two_users):
         for path in home.rglob("*"):
             st = path.stat()
             assert st.st_uid != 0, f"root-owned leak at {path}"
+
+
+def test_admin_set_invalid_date_returns_user_error(two_users):
+    """Regression: ShushuError raised inside the admin fork-child must be
+    translated to its proper exit code (64), not swallowed by
+    privilege.run_as_user's generic Exception handler as EXIT_INTERNAL (70).
+    """
+    alice, _bob = two_users
+    r = _shushu("set", "--user", alice, "BADDATE", "v", "--alert-at", "not-a-date")
+    assert r.returncode == 64, f"got {r.returncode}, stderr: {r.stderr}"
+    assert "invalid date" in r.stderr.lower() or "yyyy-mm-dd" in r.stderr.lower()
+
+
+def test_admin_delete_missing_returns_user_error(two_users):
+    """Regression: store.NotFoundError raised inside the admin fork-child must
+    translate to exit 64 with the standard 'see: shushu list' remediation,
+    not EXIT_INTERNAL (70).
+    """
+    alice, _bob = two_users
+    r = _shushu("delete", "--user", alice, "NONEXISTENT_SECRET")
+    assert r.returncode == 64, f"got {r.returncode}, stderr: {r.stderr}"
+    assert "NONEXISTENT_SECRET" in r.stderr

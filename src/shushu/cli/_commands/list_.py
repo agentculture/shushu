@@ -22,6 +22,7 @@ def handle(args) -> int:
 
 def _handle_all_users(args) -> int:
     import json as _json
+    import sys as _sys
 
     from shushu import admin
 
@@ -31,7 +32,12 @@ def _handle_all_users(args) -> int:
             data_raw = paths.file.read_text(encoding="utf-8")
         except OSError:
             return None
-        names = sorted(s["name"] for s in _json.loads(data_raw).get("secrets", []))
+        try:
+            raw = _json.loads(data_raw)
+            names = sorted(s["name"] for s in raw.get("secrets", []))
+        except (_json.JSONDecodeError, TypeError, KeyError) as exc:
+            _sys.stderr.write(f"shushu: warning: skipping {info.name}: corrupt store ({exc})\n")
+            return None
         return {"user": info.name, "names": names}
 
     rows = admin.for_each_user(_row)
@@ -62,4 +68,4 @@ def _handle_admin_user(args) -> int:
                 print(n)
         return 0
 
-    return admin.as_user(args.user, _child)
+    return admin.as_user(args.user, _child, json_mode=args.json)

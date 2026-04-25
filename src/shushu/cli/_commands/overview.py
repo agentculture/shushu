@@ -31,6 +31,7 @@ def handle(args) -> int:
 
 def _handle_all_users(args) -> int:
     import json as _json
+    import sys as _sys
 
     from shushu import admin
 
@@ -42,34 +43,13 @@ def _handle_all_users(args) -> int:
             data_raw = paths.file.read_text(encoding="utf-8")
         except OSError:
             return None
-        raw = _json.loads(data_raw)
-        records = []
-        for secret in raw.get("secrets", []):
-            alert_at_val = None
-            if secret.get("alert_at"):
-                try:
-                    from datetime import date
-
-                    alert_at_val = date.fromisoformat(secret["alert_at"])
-                except (ValueError, TypeError):
-                    pass
-            state = alerts.classify(alert_at_val)
-            if expired_only and state != "expired":
-                continue
-            records.append(
-                {
-                    "name": secret["name"],
-                    "hidden": secret.get("hidden", False),
-                    "source": secret.get("source", ""),
-                    "purpose": secret.get("purpose", ""),
-                    "rotation_howto": secret.get("rotation_howto", ""),
-                    "alert_at": secret.get("alert_at"),
-                    "alert_state": state,
-                    "handed_over_by": secret.get("handed_over_by"),
-                    "created_at": secret.get("created_at"),
-                    "updated_at": secret.get("updated_at"),
-                }
-            )
+        try:
+            raw = _json.loads(data_raw)
+            secrets_iter = list(raw.get("secrets", []))
+            records = _build_overview_records(secrets_iter, expired_only)
+        except (_json.JSONDecodeError, TypeError, KeyError) as exc:
+            _sys.stderr.write(f"shushu: warning: skipping {info.name}: corrupt store ({exc})\n")
+            return None
         return {"user": info.name, "secrets": records}
 
     rows = admin.for_each_user(_row)
@@ -108,7 +88,39 @@ def _handle_admin_user(args) -> int:
             _render_text(records)
         return 0
 
-    return admin.as_user(args.user, _child)
+    return admin.as_user(args.user, _child, json_mode=args.json)
+
+
+def _build_overview_records(secrets_iter, expired_only):
+    """Build overview rows from a list of raw secret dicts (--all-users path)."""
+    from datetime import date as _date
+
+    out = []
+    for secret in secrets_iter:
+        alert_at_val = None
+        if secret.get("alert_at"):
+            try:
+                alert_at_val = _date.fromisoformat(secret["alert_at"])
+            except (ValueError, TypeError):
+                pass
+        state = alerts.classify(alert_at_val)
+        if expired_only and state != "expired":
+            continue
+        out.append(
+            {
+                "name": secret["name"],
+                "hidden": secret.get("hidden", False),
+                "source": secret.get("source", ""),
+                "purpose": secret.get("purpose", ""),
+                "rotation_howto": secret.get("rotation_howto", ""),
+                "alert_at": secret.get("alert_at"),
+                "alert_state": state,
+                "handed_over_by": secret.get("handed_over_by"),
+                "created_at": secret.get("created_at"),
+                "updated_at": secret.get("updated_at"),
+            }
+        )
+    return out
 
 
 def _record_to_dict(record, state):

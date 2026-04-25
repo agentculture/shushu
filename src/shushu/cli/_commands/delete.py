@@ -34,4 +34,4 @@ def _handle_admin_user(args) -> int:
             print(f"shushu: deleted {name_to_delete}")
         return 0
 
-    return admin.as_user(args.user, _child)
+    return admin.as_user(args.user, _child, json_mode=args.json)
