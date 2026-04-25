@@ -58,7 +58,9 @@ def _check_admin_source_prefix(source) -> None:
 
 def _read_value(v: str) -> str:
     if v == "-":
-        return sys.stdin.read().rstrip("\n")
+        # Strip at most ONE trailing newline (the shell-piped sentinel).
+        # Preserve any other trailing newlines that are part of the secret.
+        return sys.stdin.read().removesuffix("\n")
     return v
 
 
@@ -124,7 +126,11 @@ def _rebuild_admin_tail(args) -> str:
 def _emit_ok(rec, json_mode: bool) -> None:
     if json_mode:
         emit_result(
-            {"name": rec.name, "hidden": rec.hidden, "updated_at": rec.updated_at.isoformat()},
+            {
+                "name": rec.name,
+                "hidden": rec.hidden,
+                "updated_at": rec.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
             json_mode=True,
         )
     else:

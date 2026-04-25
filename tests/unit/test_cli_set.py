@@ -36,8 +36,16 @@ def test_set_with_value_creates_record():
 def test_set_with_stdin_dash_reads_value():
     rc, _, _ = _run(["set", "FOO", "-"], stdin_text="from-stdin\n")
     assert rc == 0
-    # trailing newline stripped
+    # one trailing shell-piped newline stripped
     assert store.get_value("FOO") == "from-stdin"
+
+
+def test_set_with_stdin_dash_strips_only_one_trailing_newline():
+    # If the secret legitimately ends with newlines, only ONE (the
+    # shell-piped sentinel) should be stripped.
+    rc, _, _ = _run(["set", "FOO", "-"], stdin_text="line-one\nline-two\n\n")
+    assert rc == 0
+    assert store.get_value("FOO") == "line-one\nline-two\n"
 
 
 def test_set_without_value_updates_metadata_only():
@@ -63,7 +71,7 @@ def test_set_rejects_admin_source_prefix_without_sudo(monkeypatch):
 
 
 def test_set_rejects_lowercase_name():
-    rc, _, err = _run(["set", "lowercase", "v"])
+    rc, _, _ = _run(["set", "lowercase", "v"])
     assert rc == 64
 
 

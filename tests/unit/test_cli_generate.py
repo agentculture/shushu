@@ -50,7 +50,27 @@ def test_generate_base64_stores_correctly():
 
 
 def test_generate_json_output_never_includes_value_for_hidden():
-    rc, out = _run(["generate", "SECRET", "--hidden", "--json"])
+    _, out = _run(["generate", "SECRET", "--hidden", "--json"])
     payload = json.loads(out)
     assert "value" not in payload
     assert payload["hidden"] is True
+
+
+def test_generate_regenerate_preserves_hidden_immutable():
+    # Create a hidden secret manually, then regenerate without --hidden.
+    # The implementation must preserve hidden=True (not silently flip it),
+    # and not raise an immutability error since the user didn't ASK to change it.
+    store.set_secret(name="K", value="initial", hidden=True, source="ldap", purpose="p")
+    rc, out = _run(["generate", "K"])
+    assert rc == 0
+    rec = store.get_record("K")
+    assert rec.hidden is True  # preserved
+    assert rec.source == "ldap"  # preserved
+    assert rec.value != "initial"  # actually regenerated
+    assert rec.value not in out  # hidden contract holds
+
+
+def test_generate_regenerate_rejects_changing_source():
+    store.set_secret(name="K", value="v", hidden=False, source="localhost", purpose="")
+    rc, _ = _run(["generate", "K", "--source", "https://other"])
+    assert rc == 64

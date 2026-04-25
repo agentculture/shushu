@@ -14,7 +14,42 @@ def handle(args) -> int:
     _check_admin_source_prefix(args.source)
     alert_at = _parse_alert_at(args)
     value = _random_value(args)
-    rec = store.set_secret(
+    rec = _persist(args, value, alert_at)
+    _emit(rec, args)
+    return 0
+
+
+def _persist(args, value: str, alert_at):
+    """Create or regenerate. On regenerate: preserve hidden/source/handed_over_by;
+    reject attempts to change immutables (mirrors `set`'s overwrite path)."""
+    try:
+        existing = store.get_record(args.name)
+    except store.NotFoundError:
+        existing = None
+    if existing is not None:
+        if args.source is not None and args.source != existing.source:
+            raise ShushuError(
+                EXIT_USER_ERROR,
+                "source is immutable post-create",
+                "delete and re-create to change",
+            )
+        if args.hidden and not existing.hidden:
+            raise ShushuError(
+                EXIT_USER_ERROR,
+                "hidden is immutable post-create",
+                "delete and re-create to change",
+            )
+        return store.set_secret(
+            name=args.name,
+            value=value,
+            hidden=existing.hidden,
+            source=existing.source,
+            purpose=args.purpose or existing.purpose,
+            rotation_howto=args.rotate_howto or existing.rotation_howto,
+            alert_at=alert_at if alert_at is not None else existing.alert_at,
+            handed_over_by=existing.handed_over_by,
+        )
+    return store.set_secret(
         name=args.name,
         value=value,
         hidden=args.hidden,
@@ -24,8 +59,6 @@ def handle(args) -> int:
         alert_at=alert_at,
         handed_over_by=None,
     )
-    _emit(rec, args)
-    return 0
 
 
 def _check_admin(args) -> None:
