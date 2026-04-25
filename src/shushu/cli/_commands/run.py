@@ -20,6 +20,15 @@ def handle(args) -> int:
             f"command not found: {cmd[0]!r}",
             "check PATH or use an absolute path",
         ) from exc
+    except (OSError, ValueError) as exc:
+        # OSError covers PermissionError (not executable), ENOEXEC (bad
+        # shebang), exec format error, etc. ValueError covers empty /
+        # embedded-NUL key or value in env.
+        raise ShushuError(
+            EXIT_USER_ERROR,
+            f"failed to execute {cmd[0]!r}: {exc}",
+            "check executable bit, shebang, and that VAR / value contain no NUL bytes",
+        ) from exc
     return 0  # unreachable — execvpe replaces the process
 
 
