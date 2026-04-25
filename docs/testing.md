@@ -14,7 +14,15 @@ means:
 - The most recent **3 failed** test runs are kept for post-mortem
   inspection.
 
-Cleanup is a single command: `rm -rf /tmp/shushu-tests/`.
+Cleanup is a single command: `rm -rf /tmp/shushu-tests/`. Or use the
+wrapper:
+
+```bash
+bash .claude/skills/run-tests/scripts/test.sh --clean-only
+```
+
+See `.claude/skills/run-tests/SKILL.md` for the full wrapper interface
+(`-p` parallel, `--ci` mirror, `-k` clean-after-run, etc.).
 
 ## `SHUSHU_HOME` env override
 
