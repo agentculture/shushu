@@ -32,12 +32,14 @@ jobs:
       - run: uv sync
       - run: uv run pytest -n auto --cov=shushu --cov-report=term -m "not integration"
 
-  # Integration job re-introduced in Task 26 once tests/integration/ exists
-  # (admin setuid-fork handoff tests need real useradd/userdel and run inside
-  # the disposable Docker image at .github/workflows/Dockerfile.integration).
-  # Earlier attempt used `if: hashFiles(...) != ''` to gate it, which GitHub
-  # rejected at workflow-validation time and prevented the entire `tests`
-  # workflow from starting (visible as a 0s "workflow file issue" failure).
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - name: Build integration image
+        run: docker build -f .github/workflows/Dockerfile.integration -t shushu-int .
+      - name: Run integration tests
+        run: docker run --rm -e SHUSHU_DOCKER=1 shushu-int uv run pytest tests/integration -v
 
   version-check:
     runs-on: ubuntu-latest

@@ -5,19 +5,16 @@ from __future__ import annotations
 import stat as stat_
 
 from shushu import alerts, fs, store
-from shushu.cli._errors import EXIT_STATE, EXIT_USER_ERROR, ShushuError
+from shushu.cli._errors import EXIT_STATE
 from shushu.cli._output import emit_result
 
 
 def handle(args) -> int:
     json_mode = args.json
-    # Admin variants (--user / --all-users) are wired in Task 26.
-    if getattr(args, "user", None) or getattr(args, "all_users", False):
-        raise ShushuError(
-            EXIT_USER_ERROR,
-            "doctor --user / --all-users not yet implemented",
-            "coming in Task 26",
-        )
+    if getattr(args, "all_users", False):
+        return _handle_all_users(args)
+    if getattr(args, "user", None):
+        return _handle_admin_user(args)
     report = _run_self_checks()
     payload = {"checks": report, "summary": _summarize(report)}
     if json_mode:
@@ -30,10 +27,63 @@ def handle(args) -> int:
     return 0 if payload["summary"]["fail"] == 0 else EXIT_STATE
 
 
+def _handle_all_users(args) -> int:
+    from shushu import admin
+
+    json_mode = args.json
+
+    def _row(info):
+        paths = admin.store_paths_for(info)
+        report = _run_checks_for_paths(paths)
+        summary = _summarize(report)
+        return {"user": info.name, "checks": report, "summary": summary}
+
+    rows = admin.for_each_user(_row)
+    any_fail = any(row["summary"]["fail"] > 0 for row in rows)
+    if json_mode:
+        emit_result({"users": rows}, json_mode=True)
+    else:
+        for row in rows:
+            print(f"# {row['user']}")
+            for c in row["checks"]:
+                print(f"  [{c['status']}] {c['name']}: {c['detail']}")
+            s = row["summary"]
+            print(f"  pass={s['pass']} warn={s['warn']} fail={s['fail']}")
+    return 0 if not any_fail else EXIT_STATE
+
+
+def _handle_admin_user(args) -> int:
+    import os as _os
+
+    from shushu import admin
+
+    json_mode = args.json
+
+    def _child() -> int:
+        _os.environ.pop("SHUSHU_HOME", None)
+        report = _run_self_checks()
+        payload = {"checks": report, "summary": _summarize(report)}
+        if json_mode:
+            emit_result(payload, json_mode=True)
+        else:
+            for c in report:
+                print(f"[{c['status']}] {c['name']}: {c['detail']}")
+            s = payload["summary"]
+            print(f"pass={s['pass']} warn={s['warn']} fail={s['fail']}")
+        return 0 if payload["summary"]["fail"] == 0 else EXIT_STATE
+
+    return admin.as_user(args.user, _child, json_mode=args.json)
+
+
 def _run_self_checks():
     paths = fs.user_store_paths()
+    return _run_checks_for_paths(paths)
+
+
+def _run_checks_for_paths(paths):
+    """Run all store checks against the given StorePaths. Root-readable."""
     checks = [_check_store_dir(paths)]
-    data, file_checks, fatal = _check_secrets_file(paths)
+    data, file_checks, fatal = _check_secrets_file_at(paths)
     checks.extend(file_checks)
     if fatal:
         return checks
@@ -62,8 +112,18 @@ def _check_store_dir(paths):
     return {"name": "store_dir", "status": "PASS", "detail": str(paths.dir)}
 
 
-def _check_secrets_file(paths):
-    """Return (data, checks, fatal). `fatal=True` means stop further checks."""
+def _check_secrets_file_at(paths):
+    """Return (data, checks, fatal). `fatal=True` means stop further checks.
+
+    Reads and parses `paths.file` directly for any provided `StorePaths`.
+    This does NOT call `store.load()` and does NOT take a lock — it
+    performs direct JSON validation/parsing so root can inspect any user's
+    store without forking, and so the same logic works for self-mode and
+    foreign-user paths uniformly. The corresponding `_check_record` helper
+    runs against the parsed `StoreData`.
+    """
+    import json as _json
+
     if not paths.file.exists():
         empty = store.StoreData(schema_version=store.SCHEMA_VERSION, secrets=[])
         return empty, [{"name": "schema_version", "status": "PASS", "detail": "empty store"}], False
@@ -92,8 +152,23 @@ def _check_secrets_file(paths):
             }
         )
     try:
-        data = store.load()
-    except store.StateError as exc:
+        raw = _json.loads(paths.file.read_text(encoding="utf-8"))
+        sv = raw.get("schema_version")
+        if not isinstance(sv, int):
+            raise store.StateError(
+                f"secrets.json is missing or has non-integer schema_version (got {sv!r})"
+            )
+        if sv != store.SCHEMA_VERSION:
+            raise store.StateError(
+                f"store schema_version={sv} but this binary supports {store.SCHEMA_VERSION}"
+            )
+        secrets_raw = raw.get("secrets", [])
+        if not isinstance(secrets_raw, list):
+            raise store.StateError(
+                f"secrets.json 'secrets' field must be a list (got {type(secrets_raw).__name__})"
+            )
+        data = _parse_store_data(raw)
+    except (store.StateError, ValueError, KeyError, TypeError) as exc:
         checks.append({"name": "schema_version", "status": "FAIL", "detail": str(exc)})
         return None, checks, True
     except OSError as exc:
@@ -107,6 +182,18 @@ def _check_secrets_file(paths):
         return None, checks, True
     checks.append({"name": "schema_version", "status": "PASS", "detail": f"v{data.schema_version}"})
     return data, checks, False
+
+
+def _parse_store_data(raw: dict) -> store.StoreData:
+    """Parse a JSON dict into StoreData without going through store.load().
+
+    Lets root read any user's secrets.json directly (no fork, no lock) for
+    the --all-users doctor path. Uses the public `store.record_from_json`
+    helper so the per-record schema validation stays consistent with
+    `store.load()`.
+    """
+    secrets = [store.record_from_json(d) for d in raw.get("secrets", [])]
+    return store.StoreData(schema_version=store.SCHEMA_VERSION, secrets=secrets)
 
 
 def _check_record(record):

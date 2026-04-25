@@ -6,7 +6,23 @@ with merged PRs per the per-PR version bump discipline documented in
 
 ## [Unreleased]
 
-- (nothing yet — v0.6.0 cut; next bump on the following PR)
+- (nothing yet — v0.7.0 cut; next bump on the following PR)
+
+## [0.7.0] — 2026-04-25
+
+### Added
+
+- **Admin mode** — `--user NAME` and (where applicable) `--all-users` flags now actually work for `set`, `generate`, `show`, `delete`, `list`, `overview`, and `doctor`. Implementation routes through a new `src/shushu/admin.py` module on top of `privilege.run_as_user`:
+  - **Write-side `--user`** (`set`, `generate`, `delete`): root forks → drops to target uid/gid → writes the record. Resulting files are mode 0600 and owned by the target user, never by root. `source` defaults to `admin:<invoker>` (preserved from `$SUDO_USER`); `handed_over_by = sudo_invoker()` is stamped on create and **preserved on overwrite** (history is never erased). An explicit `--source` from the caller is honored.
+  - **Read-side `--user`** (`show`, `list`, `overview`, `doctor`): also fork-and-drop, so the read happens under the target uid (consistent with self-mode permissions).
+  - **`--all-users`** (`list`, `overview`, `doctor`): root reads each user's `secrets.json` directly via `admin.store_paths_for(info)` — no fork, no identity drop. Skips users with no home dir or no store. `admin.for_each_user(fn)` enforces the root requirement up front.
+  - **H2 contract preserved**: `get`, `env`, and `run` deliberately do NOT register admin flags. Admin can never extract a value through the CLI; for plaintext, use `sudo cat`.
+- **Integration test suite** — new `tests/integration/` directory with two modules (`test_admin_handoff.py`, `test_all_users_enumeration.py`) that exercise real `useradd` / `userdel` and the setuid-fork. 11 tests covering: file ownership/mode after handoff, hidden-value non-disclosure across all admin paths, `--all-users` enumeration, `test_no_root_owned_files_left_behind` safety net. Both modules apply `pytest.mark.integration` + `skipif(euid != 0 and not SHUSHU_DOCKER)`. The CI `integration` job is back, running them inside `.github/workflows/Dockerfile.integration` per run with `SHUSHU_DOCKER=1`.
+
+### Fixed
+
+- `privilege.run_as_user` now flushes stdout/stderr before every `os._exit` call. The success path was already doing this; added the same flush before `os._exit(66)` (PrivilegeError path) and `os._exit(70)` (generic exception path) so closures that print-then-raise don't lose buffered output. Caught while writing the integration suite — `subprocess.run(capture_output=True)` was getting empty stdout from the child without the flushes.
+- `admin.as_user` sets `HOME` to the target user's home dir inside the child fork (after the uid drop, before invoking the closure). Without this, `Path.home()` in the child resolved to root's HOME (inherited from the parent's environment) and `ensure_store_dir` raised `PermissionError`. Caught by integration tests on first run.
 
 ## [0.6.0] — 2026-04-25
 

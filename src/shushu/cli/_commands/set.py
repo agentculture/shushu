@@ -15,26 +15,43 @@ from shushu.cli._output import emit_result
 
 
 def handle(args) -> int:
-    _check_admin(args)
+    if args.user is not None:
+        return _handle_admin_user(args)
     alert_at = _parse_alert_at(args)
     _check_admin_source_prefix(args.source)
     if args.value is not None:
-        rec = _set_with_value(args, _read_value(args.value), alert_at)
+        rec = write_value(args, _read_value(args.value), alert_at)
     else:
         rec = _set_metadata_only(args, alert_at)
     _emit_ok(rec, args.json)
     return 0
 
 
-def _check_admin(args) -> None:
-    if args.user is None:
-        return
-    privilege.require_root(_rebuild_admin_tail(args))
-    raise ShushuError(
-        EXIT_USER_ERROR,
-        "set --user not yet implemented",
-        "coming in Task 26 (integration task)",
-    )
+def _handle_admin_user(args) -> int:
+    import os as _os
+
+    from shushu import admin
+
+    handed_over_by = privilege.sudo_invoker()
+    admin_source = args.source or f"admin:{handed_over_by}"
+
+    def _child() -> int:
+        _os.environ.pop("SHUSHU_HOME", None)
+        alert_at = _parse_alert_at(args)
+        if args.value is None:
+            rec = _set_metadata_only(args, alert_at)
+        else:
+            rec = write_value(
+                args,
+                _read_value(args.value),
+                alert_at,
+                default_source=admin_source,
+                default_handed_over_by=handed_over_by,
+            )
+        _emit_ok(rec, args.json)
+        return 0
+
+    return admin.as_user(args.user, _child, json_mode=args.json)
 
 
 def _parse_alert_at(args):
@@ -65,10 +82,6 @@ def _read_value(v: str) -> str:
     return v
 
 
-def _set_with_value(args, value: str, alert_at):
-    return write_value(args, value, alert_at)
-
-
 def _set_metadata_only(args, alert_at):
     return store.update_metadata(
         name=args.name,
@@ -76,13 +89,6 @@ def _set_metadata_only(args, alert_at):
         rotation_howto=args.rotate_howto,
         alert_at=alert_at,
     )
-
-
-def _rebuild_admin_tail(args) -> str:
-    parts = ["set", "--user", args.user, args.name]
-    if args.value is not None:
-        parts.append(args.value)
-    return " ".join(parts)
 
 
 def _emit_ok(rec, json_mode: bool) -> None:

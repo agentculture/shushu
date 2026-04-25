@@ -11,7 +11,8 @@ from shushu.cli._output import emit_result
 
 
 def handle(args) -> int:
-    _check_admin(args)
+    if args.user is not None:
+        return _handle_admin_user(args)
     _check_admin_source_prefix(args.source)
     alert_at = _parse_alert_at(args)
     value = _random_value(args)
@@ -20,15 +21,29 @@ def handle(args) -> int:
     return 0
 
 
-def _check_admin(args) -> None:
-    if args.user is None:
-        return
-    privilege.require_root(f"generate --user {args.user} {args.name}")
-    raise ShushuError(
-        EXIT_USER_ERROR,
-        "generate --user not yet implemented",
-        "coming in Task 26",
-    )
+def _handle_admin_user(args) -> int:
+    import os as _os
+
+    from shushu import admin
+
+    handed_over_by = privilege.sudo_invoker()
+    admin_source = args.source or f"admin:{handed_over_by}"
+
+    def _child() -> int:
+        _os.environ.pop("SHUSHU_HOME", None)
+        alert_at = _parse_alert_at(args)
+        value = _random_value(args)
+        rec = write_value(
+            args,
+            value,
+            alert_at,
+            default_source=admin_source,
+            default_handed_over_by=handed_over_by,
+        )
+        _emit(rec, args)
+        return 0
+
+    return admin.as_user(args.user, _child, json_mode=args.json)
 
 
 def _check_admin_source_prefix(source) -> None:

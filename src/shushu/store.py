@@ -87,6 +87,17 @@ def _record_to_json(r: SecretRecord) -> dict[str, Any]:
     }
 
 
+def record_from_json(d: dict[str, Any]) -> SecretRecord:
+    """Public API: parse a single secrets.json record dict into a SecretRecord.
+
+    Used by `doctor --all-users` (and any future read-side admin enumeration)
+    to validate other users' stores without going through `store.load()`,
+    which would acquire a lock. Raises `StateError` on schema violations
+    (non-bool `hidden`, missing required fields, etc.).
+    """
+    return _json_to_record(d)
+
+
 def _json_to_record(d: dict[str, Any]) -> SecretRecord:
     hidden_raw = d["hidden"]
     if not isinstance(hidden_raw, bool):

@@ -141,6 +141,15 @@ if [[ "$SONAR_OPEN" != "0" ]]; then
         | jq -r '.issues[] | "    • [\(.rule)] \(.component | sub("^[^:]+:"; ""))(:\(.line // "?")) (\(.severity)) — \(.message)"'
 fi
 
+# When the QG itself failed, surface the failing conditions (often coverage /
+# duplication thresholds — failures with zero OPEN issues otherwise look opaque).
+if [[ "$SONAR_QG_STATUS" == "ERROR" || "$SONAR_QG_STATUS" == "WARN" ]]; then
+    echo
+    echo "  SonarCloud failed conditions:"
+    echo "$SONAR_QG" \
+        | jq -r '.projectStatus.conditions[] | select(.status != "OK") | "    • \(.metricKey) (\(.comparator) \(.errorThreshold)): actual = \(.actualValue)"'
+fi
+
 # ── 5. Tally + summary ────────────────────────────────────────────────────
 echo
 echo "── Inline threads ────────────────────────────────────────────────────"
