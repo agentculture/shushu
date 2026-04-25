@@ -171,7 +171,7 @@ def _load_raw_unlocked() -> StoreData:
     secrets_raw = raw.get("secrets", [])
     if not isinstance(secrets_raw, list):
         raise StateError(
-            f"secrets.json 'secrets' field must be a list " f"(got {type(secrets_raw).__name__})"
+            f"secrets.json 'secrets' field must be a list (got {type(secrets_raw).__name__})"
         )
     try:
         secrets = [_json_to_record(d) for d in secrets_raw]
